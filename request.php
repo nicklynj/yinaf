@@ -16,9 +16,9 @@ class request extends api {
 
     register_shutdown_function(array($this, 'shutdown_function'));
     
-    parent::__construct();
-    
     try {
+      
+      parent::__construct();
       
       if ($_POST['class'] == 'database') {
         throw new Exception('database not allowed');
@@ -26,7 +26,6 @@ class request extends api {
       
       die(json_encode(array(
         'success' => true,
-        'error' => null,
         'result' => $this->call(
           $_POST['class'],
           $_POST['function'],
@@ -39,12 +38,15 @@ class request extends api {
   }
   
   private function error($str) {
-    $this->database->disable_commits();
-    http_response_code(200);
+    if (isset($this->database)) {
+      $this->database->disable_commits();
+    }
+    header('HTTP/1.0 200 OK');
     die(json_encode(array(
       'success' => false,
-      'error' => htmlspecialchars($str),
-      'result' => null,
+      'result' => array(
+        'message' => htmlspecialchars($str),
+      ),
     )));
   }
   

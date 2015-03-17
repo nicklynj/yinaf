@@ -38,18 +38,18 @@ layer.prototype.get_class_names_ = function() {
 
 
 layer.prototype.get_class_name_recursive_ = function(parent, opt_prefix) {
-  var name;
   for (var i in parent) {
-    if (typeof parent[i] === 'function') {
+    if (
+      (parent[i]) &&
+      (parent[i].prototype) &&
+      (this instanceof parent[i])
+    ) {
       var name = opt_prefix ? rocket.clone(opt_prefix) : [];
       name.push(i);
       if (parent[i] === this.constructor) {
         return name;
       } else {
-        if (
-          (parent !== parent[i]) &&
-          (name = this.get_class_name_recursive_(parent[i], name))
-        ) {
+        if (name = this.get_class_name_recursive_(parent[i], name)) {
           return name;
         }
       }
@@ -80,10 +80,10 @@ layer.prototype.render = function(opt_parent) {
     ) {
       this.layer_previous_container_.parentNode().replaceChild(containers[0], this.layer_previous_container_);
     } else {
-      (opt_parent || $('body').innerHTML('')).appendChild(containers[0]);
+      (opt_parent || rocket.$('body').innerHTML('')).appendChild(containers[0]);
     }
     this.layer_previous_container_ = containers[0];
-    this.dispatchEvent('rendered');
+    this.dispatchEvent('render');
   }
 };
 
@@ -104,6 +104,7 @@ layer.prototype.render_previous = function(opt_cancel) {
     });
   }
 };
+
 
 layer.prototype.render_clear = function() {
   this.render();

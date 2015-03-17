@@ -1,6 +1,13 @@
 
 
 
+var state = function() {
+  this.state = {};
+};
+rocket.inherits(state, rocket.EventTarget);
+
+
+
 var cache = function() {
   state.apply(this, arguments);
   this.cache = {};
@@ -20,6 +27,9 @@ cache.prototype.load = function(data) {
 
 
 cache.prototype.create = function(table, attributes) {
+  if (!this.cache[table]) {
+    this.cache.table = {};
+  }
   return this.update(table, rocket.extend(
     rocket.object(table + '_id', --cache.last_insert_id), 
     attributes
@@ -39,7 +49,7 @@ cache.prototype.read = function(table, ids_or_attributes) {
   var caches = [cache.cache];
   var layers = this.get_layers();
   for (var i = 0; layers[i]; ++i) {
-    caches.push(layers[i].cache);
+    cache.caches.push(layers[i].cache);
   }
   if (rocket.equal([table + '_id'], rocket.keys(attributes))) {
     return this.read_results_(caches, table, attributes[table + '_id']);
@@ -111,11 +121,11 @@ cache.prototype.read_results_ = function(caches, table, ids) {
 
 cache.prototype.update = function(table, attributes) {
   var id = attributes[table + '_id'];
-  if (!(table in this.cache)) {
-    this.cache[table] = {};
-  }
-  if (!(id in this.cache[table])) {
-    this.cache[table][id] = {};
+  switch (undefined) {
+    case this.cache[table]:
+      this.cache[table] = {};
+    case this.cache[table][id]:
+      this.cache[table][id] = {};
   }
   rocket.extend(this.cache[table][id], attributes);
   return this.get(table, id);
@@ -123,25 +133,18 @@ cache.prototype.update = function(table, attributes) {
 
 
 cache.prototype.del = function(table, id) {
-  return this.update(table, rocket.extend(rocket.object(
-    table + '_id',
-    id
-  ), {'deleted': '1'}));
+  return this.update(table, {'deleted': '1'});
 };
 
 
 cache.prototype.get = function(table, id_or_attributes) {
-  var results;
   if (
     (typeof id_or_attributes === 'number') ||
     (typeof id_or_attributes === 'string')
   ) {
-    results = this.read(table, [id_or_attributes]);
+    return this.read(table, [id_or_attributes]);
   } else {
-    results = this.read(table, id_or_attributes);
-  }
-  for (var id in results) {
-    return results[id];
+    return this.read(table, id_or_attributes);
   }
 };
 
@@ -151,16 +154,15 @@ cache.prototype.flush = function(callback) {
   var negative_pointers = this.flush_remove_negative_pointers();
   var unresolved_negative_pointers = [];
   this.flush_move_unresolved_negative_pointer_rows_back(negative_pointers, unresolved_negative_pointers);
-  var alias_to_table = [];
+  var aliases = [];
   var calls = [];
-  this.flush_get_inserts(calls, alias_to_table, negative_pointers);
-  this.flush_get_updates(calls, alias_to_table);
-  this.flush_get_updates_from_negative_pointers(calls, alias_to_table, negative_pointers);
-  this.cache = {};
+  this.flush_get_inserts(calls, aliases, negative_pointers);
+  this.flush_get_updates(calls, aliases);
+  this.flush_get_updates_from_negative_pointers(callas, aliases, negative_pointers);
   if (calls.length) {
     var self = this;
     api('api', 'multiple', calls, function(result) {
-      self.flush_handle_result(result, alias_to_table, negative_pointers, unresolved_negative_pointers);
+      self.flush_handle_result(result, aliases, negative_pointers, unresolved_negative_pointers);
       callback();
     });
   } else {
@@ -201,7 +203,7 @@ cache.prototype.flush_remove_negative_pointers = function() {
           (column.substr(column.length - 3) === '_id') &&
           (this.cache[table][id][column] < 0)
         ) {
-          pointers.push({
+          this.pointers.push({
             'table': table,
             'id': id,
             'column': column,
@@ -234,7 +236,7 @@ cache.prototype.flush_move_unresolved_negative_pointer_rows_back = function(nega
       }
       if (!match) {
         this.flush_replace_negative_pointer(negative_pointers, pointer.table, pointer.id, unresolved_negative_pointers);
-        this.get_previous_layer().update(pointer.table, this.cache[pointer.table][pointer.id]);
+        this.get_previous_layer().cache.update(pointer.table, this.cache[pointer.table][pointer.id]);
         delete this.cache[pointer.table][pointer.id];
         return this.flush_move_unresolved_negative_pointer_rows_back(negative_pointers, unresolved_negative_pointers);
       }
@@ -257,7 +259,7 @@ cache.prototype.flush_replace_negative_pointer = function(negative_pointers, tab
 };
 
 
-cache.prototype.flush_get_inserts = function(calls, alias_to_table, negative_pointers) {
+cache.prototype.flush_get_inserts = function(calls, aliases, negative_pointers) {
   for (var table in this.cache) {
     for (var id in this.cache[table]) {
       if (id < 0) {
@@ -267,9 +269,9 @@ cache.prototype.flush_get_inserts = function(calls, alias_to_table, negative_poi
               'class': table,
               'function': 'create',
               'arguments': this.cache[table][id],
-              'alias': (negative_pointers[i].alias = alias_to_table.length)
+              'alias': (negative_pointers.alias = aliases.length)
             });
-            alias_to_table.push(table);
+            aliases.push(table);
             break;
           }
         }
@@ -279,30 +281,24 @@ cache.prototype.flush_get_inserts = function(calls, alias_to_table, negative_poi
 };
 
 
-cache.prototype.flush_get_updates = function(calls, alias_to_table) {
+cache.prototype.flush_get_updates = function(aliases) {
   for (var table in this.cache) {
     for (var id in this.cache[table]) {
       if (id > 0) {
         calls.push({
-          'alias': alias_to_table.length,
+          'alias': aliases.length
           'class': table,
-          'function': 'update_2015',
-          'arguments': rocket.extend(
-            rocket.object(
-              table + '_id',
-              id
-            ),
-            this.cache[table][id]
-          )
+          'function': 'create',
+          'arguments': this.cache[table]
         });
-        alias_to_table.push(table);
+        aliases.push(table);
       }
     }
   }
 };
 
 
-cache.prototype.flush_get_updates_from_negative_pointers = function(calls, alias_to_table, negative_pointers) {
+cache.prototype.flush_get_updates_from_negative_pointers = function(calls, aliases, negative_pointers) {
   for (var i = 0; negative_pointers[i]; ++i) {
     var pointer = negative_pointers[i];
     if (!pointer.self) {
@@ -313,43 +309,214 @@ cache.prototype.flush_get_updates_from_negative_pointers = function(calls, alias
         for (j = 0; negative_pointers[j]; ++j) {
           if (
             (negative_pointers[j].self) &&
-            (negative_pointers[j].value === +pointer.id)
+            (negative_pointers[j].value === pointer.id)
           ) {
-            id = '=' + negative_pointers[j].alias + '.' + pointer.table + '_id';
-            break;
+            id = '=' + negative_pointers[j].alias;
           }
         }
       }
       for (var j = 0; negative_pointers[j]; ++j) {
         if (
           (negative_pointers[j].self) &&
-          (negative_pointers[j].value === pointer.value)
+          (negative_pointers[j].value === negative_pointers[i].value)
         ) {
-          var value = '=' + negative_pointers[j].alias + '.' + pointer.table + '_id';
-          break;
+          var value = '=' + negative_pointers[j].alias;
         }
       }
       calls.push({
-        'alias': alias_to_table.length,
+        'alias': aliases.length,
         'class': pointer.table,
-        'function': 'update_2015',
+        'function': 'update',
         'arguments': rocket.extend(
           rocket.object(pointer.table + '_id', id),
           rocket.object(pointer.column, value)
         )
       });
-      alias_to_table.push(pointer.table);
+      aliases.push(pointer.table);
     }
   }
 };
 
 
-cache.prototype.flush_handle_result = function(result, alias_to_table, negative_pointers, unresolved_negative_pointers) {
+cache.prototype.flush_handle_result = function(result, aliases, negative_pointers, unresolved_negative_pointers) {
   for (var alias in result) {
-    if (!(alias_to_table[alias] in cache.cache)) {
-      cache.cache[alias_to_table[alias]] = {};
+    if (!(aliases[alias] in cache.cache)) {
+      cache.cache = {};
     }
-    cache.cache[alias_to_table[alias]][result[alias][alias_to_table[alias] + '_id']] = result[alias];
+    rocket.extend(cache.cache, rocket.object(
+      result[alias][aliases[alias] + '_id'],
+      result[alias]
+    ));
   }
 };
 
+
+
+
+var layer = function() {
+  cache.apply(this, arguments);
+  this.get_class_names_()  
+  if (this instanceof layer) {
+    layer.layers.push(this);
+    if (this.get_previous_layer()) {
+      this.state = rocket.clone(this.get_previous_layer().state);
+    }
+  }
+};
+rocket.inherits(layer, cache);
+
+
+layer.layers = [];
+
+
+layer.prototype.get_previous_layer = function() {
+  for (var i = 0; layer.layers[i]; ++i) {
+    if (layer.layers[i] === this) {
+      return layer.layers[i - 1];
+    }
+  }
+};
+
+
+layer.prototype.get_layers = function() {
+  return layer.layers;
+};
+
+
+layer.prototype.get_class_names_ = function() {
+  return this.constructor.prototype.class_names = this.class_names = this.class_names || 
+    this.get_class_name_recursive_(window);
+};
+
+
+layer.prototype.get_class_name_recursive_ = function(parent, opt_prefix) {
+  var name;
+  for (var i in parent) {
+    if (typeof parent[i] === 'function') {
+      var name = opt_prefix ? rocket.clone(opt_prefix) : [];
+      name.push(i);
+      if (parent[i] === this.constructor) {
+        return name;
+      } else {
+        if (
+          (parent !== parent[i]) &&
+          (name = this.get_class_name_recursive_(parent[i], name))
+        ) {
+          return name;
+        }
+      }
+    }
+  }
+};
+
+
+layer.prototype.layer_previous_container_;
+
+
+layer.prototype.render = function(opt_parent) {
+  var container = rocket.createElement('div');
+  rocket.EventTarget.removeAllEventListeners();
+  this.decorate(container);
+  if (container.innerHTML()) {
+    var containers = [];
+    for (var i = 0; this.class_names[i]; ++i) {
+      containers.push(rocket.createElement('div').addClass(this.class_names[i]));
+      if (i) {
+        containers[i - 1].appendChild(containers[i]);
+      }
+    }
+    containers[containers.length - 1].appendChild(container);
+    if (
+      (this.layer_previous_container_) &&
+      (this.layer_previous_container_.parentNode().length)
+    ) {
+      this.layer_previous_container_.parentNode().replaceChild(containers[0], this.layer_previous_container_);
+    } else {
+      (opt_parent || $('body').innerHTML('')).appendChild(containers[0]);
+    }
+    this.layer_previous_container_ = containers[0];
+    this.dispatchEvent('rendered');
+  }
+};
+
+
+layer.prototype.decorate = function() {};
+
+
+layer.prototype.render_previous = function(opt_cancel) {
+  if (opt_cancel) {
+    layer.layers.pop();
+    layer.layers[layer.layers.length - 1].render();
+  } else {
+    layer.layers[layer.layers.length - 2].state = this.state;
+    rocket.EventTarget.removeAllEventListeners();
+    this.flush(function() {
+      layer.layers.pop();
+      layer.layers[layer.layers.length - 1].render();
+    });
+  }
+};
+
+layer.prototype.render_clear = function() {
+  this.render();
+  layer.layers = [this];
+};
+
+
+
+var component = function() {
+  layer.apply(this, arguments);
+};
+rocket.inherits(component, layer);
+
+
+component.prototype.decorate = function() {};
+
+
+
+var api = function(cls, fnct, opt_args, opt_success, opt_xhr) {
+
+  var xhr = opt_xhr || (new rocket.XMLHttpRequest());
+
+  xhr.data = {
+    'class': cls,
+    'function': fnct,
+    'arguments': rocket.JSON.stringify((opt_args === undefined) ? null : opt_args)
+  };
+
+  xhr.open('POST', 'moxee_api');
+  
+  xhr.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
+
+  xhr.addEventListener('success', function() {
+    try {
+      var response = rocket.JSON.parse(this.responseText);
+      if (response.success) {
+        if (opt_success) {
+          opt_success(response.result);
+        }
+      } else {
+        throw response.error;
+      }
+    } catch (e) {
+      if (error) {
+        error(e);
+      }
+    }
+  });
+  
+  xhr.addEventListener('error', function() {
+    if (error) {
+      error('XMLHttpRequest failure');
+    }
+  });
+
+  xhr.send();
+
+};
+
+
+
+var error = function(str) {
+  alert('error:"' + str + '"');
+};

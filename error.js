@@ -1,6 +1,6 @@
 
 
 
-var error = function(str) {
-  alert('error:"' + str + '"');
+var error = function(err) {
+  alert('error:"' + err.message + '"');
 };

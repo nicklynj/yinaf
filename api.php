@@ -1,0 +1,53 @@
+<?php
+
+class api {
+  private static $database_instance;
+  protected $database;
+  public function __construct() {
+    if (!isset(self::$database_instance)) {
+      require_once '../../password.php';
+      self::$database_instance = new database(
+        DB_HOST,
+        DB_USER,
+        DB_PASS,
+        DB_NAME
+      );
+    }
+    $this->database = self::$database_instance;
+  }
+  protected function call($class, $function/* , $var_args */) {
+    return call_user_func_array(
+      array(class_exists($class) ? new $class() : new crud($class), $function),
+      array_slice(func_get_args(), 2)
+    );
+  }
+  public function multiple($arguments) {
+    $results = array();
+    foreach ($arguments as $argument) {
+      $results[isset($argument['alias']) ? $argument['alias'] : $argument['class']] =
+        $this->call(
+          $argument['class'], 
+          $argument['function'], 
+          $this->replacer($argument['arguments'], $results)
+        );
+    }
+    return $results;
+  }
+  private function replacer($arguments, $results) {
+    foreach ($arguments as $key => $value) {
+      if (substr($value, 0, 1) === '=') {
+        $columns = preg_split('/[\.\[]/', str_replace(']', '', substr($value, 1)));
+        $replace = $results;
+        for ($i = 0; isset($columns[$i]); ++$i) {
+          if ($columns[$i]) {
+            $replace = $replace[$columns[$i]];
+          } else {
+            $replace = array_column($replace, $columns[++$i]);
+          }
+        }
+        $arguments[$key] = $replace;
+      }
+    }
+    return $arguments;
+  }
+}

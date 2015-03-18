@@ -7,7 +7,8 @@ class database extends mysqli {
   private $transaction_started = false;
   private $escaping_disabled = false;
   private $commits_disabled = false;
-  private $auditing_readback_disabled = false;
+  private $readback_disabled = false;
+  private $caching_disabled = false;
   private $old_rows = array();
   private $new_rows = array();
   private function word($str) {
@@ -62,9 +63,11 @@ class database extends mysqli {
           }
           unset($rows);
         }
-        $this->disable_auditing_readback();
+        $this->disable_readback();
+        $this->disable_caching();
         new audit($this->old_rows, $this->new_rows);
-        $this->enable_auditing_readback();
+        $this->enable_readback();
+        $this->enable_caching();
       }
       $this->old_rows = array();
       $this->new_rows = array();
@@ -73,7 +76,7 @@ class database extends mysqli {
       $this->transaction_started = false;
     }
   }
-  private function query_($str) { var_dump($str);
+  private function query_($str) { // var_dump($str);
     ++$this->number_of_queries;
     $this->query_time -= microtime(true);
     $result = parent::query($str);
@@ -101,11 +104,17 @@ class database extends mysqli {
   public function disable_commits() {
     $this->commits_disabled = true;
   }
-  public function disable_auditing_readback() {
-    $this->auditing_readback_disabled = true;
+  public function disable_readback() {
+    $this->readback_disabled = true;
   }
-  public function enable_auditing_readback() {
-    $this->auditing_readback_disabled = false;
+  public function enable_readback() {
+    $this->readback_enabled = true;
+  }
+  public function disable_caching() {
+    $this->caching_disabled = true;
+  }
+  public function enable_caching() {
+    $this->caching_enabled = true;
   }
   
   public function get_number_of_queries() {
@@ -129,7 +138,7 @@ class database extends mysqli {
       return '"' . $this->real_escape_string($str) . '"';
     }
   }
-
+  
   public function query($str) {
     throw new Exception('query disabled');
   }
@@ -155,7 +164,7 @@ class database extends mysqli {
       $this->query_($query);
       $ids[] = $this->insert_id;
     }
-    if ($this->auditing_readback_disabled) {
+    if ($this->readback_disabled) {
       if ($all_numeric_keys) {
         return $ids;
       } else {
@@ -171,16 +180,17 @@ class database extends mysqli {
       }
     }
   }
-  public function read($table, $ids_or_attributes, $created = false) {
+  public function read($table, $ids_or_attributes, $updated = false) {
     $this->start_transaction();
     if ($this->all_numeric_keys($ids_or_attributes)) {
       $ids = $ids_or_attributes;
-      if (!(
-        array_diff($ids, 
+      if (
+        (!$updated) and
+        (!array_diff($ids, 
           (isset($this->new_rows[$table]) ? array_keys($this->new_rows[$table]) : array()),
           (isset($this->old_rows[$table]) ? array_keys($this->old_rows[$table]) : array())
-        )
-      )) {
+        ))
+      ) {
         $results = array();
         foreach ($ids as $id) {
           if (isset($this->new_rows[$table][$id])) {
@@ -222,9 +232,12 @@ class database extends mysqli {
     $results = array();
     while ($row = $result->fetch_assoc()) {
       $results[$row[$table . '_id']] = $row;
-      if (!($this->auditing_readback_disabled)) {
+      if (
+        (!($this->readback_disabled)) and
+        (!($this->caching_disabled))
+      ) {
         if (
-          ($created) or
+          ($updated) or
           (isset($this->old_rows[$table][$row[$table . '_id']]))
         ) {
           $this->new_rows[$table][$row[$table . '_id']] = $row;
@@ -246,7 +259,7 @@ class database extends mysqli {
     foreach ($updates as &$update) {
       $ids[] = $update[$table . '_id'];
     }
-    if (!($this->auditing_readback_disabled)) {
+    if (!($this->caching_disabled)) {
       $this->read($table, $ids);
     }
     foreach ($updates as &$update) {
@@ -266,7 +279,7 @@ class database extends mysqli {
         $this->query_($query);
       }
     }
-    if ($this->auditing_readback_disabled) {
+    if ($this->readback_disabled) {
       if ($all_numeric_keys) {
         return $ids;
       } else {
@@ -276,7 +289,7 @@ class database extends mysqli {
       }
     } else {
       if ($all_numeric_keys) {
-        $indexed_results = $this->read($table, $ids);
+        $indexed_results = $this->read($table, $ids, true);
         $ordered_results = array();
         foreach ($ids as $id) {
           $ordered_results[] = $indexed_results[$id];

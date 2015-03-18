@@ -6,10 +6,10 @@ class api {
   public function __construct() {
     if (!isset(self::$database_instance)) {
       self::$database_instance = new database(
-        '10.10.0.22',
-        'super',
-        'password',
-        'test'
+        configuration::$database_host,
+        configuration::$database_username,
+        configuration::$database_password,
+        configuration::$database_name
       );
     }
     $this->database = self::$database_instance;

@@ -4,10 +4,12 @@ class database extends mysqli {
 
   private $number_of_queries = 0;
   private $query_time = 0;
-  private $transactions_disabled = false;
   private $transaction_started = false;
-  private $escape_values = true;
+  private $escaping_disabled = false;
   private $commits_disabled = false;
+  private $auditing_readback_disabled = false;
+  private $old_rows = array();
+  private $new_rows = array();
   private function word($str) {
     if (preg_match('/^[\d\w]+$/', $str)) {
       return '`' . $str . '`';
@@ -16,77 +18,62 @@ class database extends mysqli {
     }
   }
   private function escape_if($str) {
-    if ($this->escape_values) {
-      return $this->escape($str);
-    } else {
+    if ($this->escaping_disabled) {
       return $str;
+    } else {
+      return $this->escape($str);
     }
   }
   private function column_equals_value($column, $value) {
     return $this->word($column) . '=' . $this->escape_if($value);
   }
   private function start_transaction() {
-    if (
-      (!$this->transaction_started) and
-      (!$this->transactions_disabled)
-    ) {
+    if (!$this->transaction_started) {
       $query = 'start transaction';
-      $this->query($query);
+      $this->query_($query);
       $this->transaction_started = true;
     }
   }
   private function commit_transaction() {
-    if ($this->transaction_started) {
-      $query = 'commit';
-      $this->query($query);
-    }
-  }
-  
-  function __destruct() {
     if (
       ($this->transaction_started) and
       (!$this->commits_disabled)
     ) {
-      $this->commit_transaction();
+      if (class_exists('audit')) {
+        foreach ($this->old_rows as $table => &$rows) {
+          if (isset($this->new_rows[$table])) {
+            foreach ($rows as $id => &$row) {
+              if (isset($this->new_rows[$table][$id])) {
+                $this->new_rows[$table][$id] = array_diff_assoc(
+                  $this->new_rows[$table][$id],
+                  $row
+                );
+                $row = array_intersect_key(
+                  $row,
+                  $this->new_rows[$table][$id]
+                );
+              } else {
+                unset($this->old_rows[$table][$id]);
+              }
+              unset($row);
+            }
+          } else {
+            unset($this->old_rows[$table]);
+          }
+          unset($rows);
+        }
+        $this->disable_auditing_readback();
+        new audit($this->old_rows, $this->new_rows);
+        $this->enable_auditing_readback();
+      }
+      $this->old_rows = array();
+      $this->new_rows = array();
+      $query = 'commit';
+      $this->query_($query);
+      $this->transaction_started = false;
     }
   }
-  
-  public function disable_escaping() {
-    $this->escape_values = false;
-  }
-  public function enable_escaping() {
-    $this->escape_values = true;
-  }
-  public function disable_transactions() {
-    if (!$this->transaction_started) {
-      $this->transactions_disabled = true;
-    }
-  }
-  public function disable_commits() {
-    $this->commits_disabled = true;
-  }
-  
-  public function get_number_of_queries() {
-    return $this->number_of_queries;
-  }
-  public function get_query_time() {
-    return $this->query_time;
-  }
-  
-  public function uuid() {
-    $result = $this->query('select uuid()');
-    return $result['uuid()'];
-  }
-  
-  public function escape($str) {
-    if ($str === null) {
-      return 'null';
-    } else {
-      return '"' . $this->real_escape_string($str) . '"';
-    }
-  }
-
-  public function query($str) {
+  private function query_($str) {
     ++$this->number_of_queries;
     $this->query_time -= microtime(true);
     $result = parent::query($str);
@@ -97,18 +84,103 @@ class database extends mysqli {
       throw new Exception($this->error . ':' . $str);
     }
   }
+  private function all_numeric_keys($attributes) {
+    return (!(in_array(false, array_map('is_int', array_keys($attributes)), true)));
+  }
   
-  public function select($table, $ids_or_attributes) {
-    $clauses = array();
-    if ($numeric_keys = array_flip(array_filter(array_keys($ids_or_attributes), 'is_int'))) {
-      $ids_or_attributes[$table . '_id'] = array_intersect_key($ids_or_attributes, $numeric_keys);
-      $attributes = array_diff_key($ids_or_attributes, $numeric_keys);
+  function __destruct() {
+    $this->commit_transaction();
+  }
+  
+  public function disable_escaping() {
+    $this->escaping_disabled = true;
+  }
+  public function enable_escaping() {
+    $this->escaping_disabled = false;
+  }
+  public function disable_commits() {
+    $this->commits_disabled = true;
+  }
+  public function disable_auditing_readback() {
+    $this->auditing_readback_disabled = true;
+  }
+  public function enable_auditing_readback() {
+    $this->auditing_readback_disabled = false;
+  }
+  
+  public function get_number_of_queries() {
+    return $this->number_of_queries;
+  }
+  public function get_query_time() {
+    return $this->query_time;
+  }
+  
+  public function uuid() {
+    $result = $this->query_('select uuid()');
+    return $result['uuid()'];
+  }
+  
+  public function escape($str) {
+    if ($str === null) {
+      return 'null';
+    } else if (is_int($str)) {
+      return $str;
+    } else {
+      return '"' . $this->real_escape_string($str) . '"';
     }
-    if (in_array(false, array_map('is_int', array_keys($ids_or_attributes)), true) === false) {
+  }
+
+  public function query($str) {
+    throw new Exception('query disabled');
+  }
+
+  public function commit() {
+    $this->commit_transaction();
+  }
+  
+  public function create($table, $attributes) {
+    $this->start_transaction();
+    if ($all_numeric_keys = $this->all_numeric_keys($attributes)) {
+      $inserts = $attributes;
+    } else {
+      $inserts = array($attributes);
+    }
+    $ids = array();
+    foreach ($inserts as &$insert) {
+      $query = 
+        'insert into ' . $this->word($table) . ' ' . 
+        ' (' . implode(',', array_map(array($this, 'word'), array_keys($insert))) . ') ' .
+        'values ' .
+        '(' . implode(',', array_map(array($this, 'escape_if'), $insert)) . ')';
+      $this->query_($query);
+      $ids[] = $this->insert_id;
+    }
+    if ($this->auditing_readback_disabled) {
+      if ($all_numeric_keys) {
+        return $ids;
+      } else {
+        foreach ($ids as $id) {
+          return $id;
+        }
+      }
+    } else {
+      if ($all_numeric_keys) {
+        return array_values($this->read($table, $ids, true));
+      } else {
+        return $this->get($table, $ids);
+      }
+    }
+  }
+  public function read($table, $ids_or_attributes, $created = false) {
+    $this->start_transaction();
+    if ($this->all_numeric_keys($ids_or_attributes)) {
       $attributes = array(
-        $table . '_id' => $attributes,
+        $table . '_id' => $ids_or_attributes,
       );
+    } else {
+      $attributes = $ids_or_attributes;
     }
+    $clauses = array();
     foreach ($attributes as $key => $value) {
       $clause = $this->word($key);
       if (is_array($value)) {
@@ -119,6 +191,8 @@ class database extends mysqli {
         } else {
           return array();
         }
+      } else if ($value === null) {
+        $clause .= ' is null';
       } else {
         $clause .= '=' . $this->escape_if($value);
       }
@@ -127,12 +201,74 @@ class database extends mysqli {
     $query =
       'select * from ' . $this->word($table) . ' ' .
       'where (' . implode(') and (', $clauses) . ')';
-    $result = $this->query($query);
+    $result = $this->query_($query);
     $results = array();
     while ($row = $result->fetch_assoc()) {
       $results[$row[$table . '_id']] = $row;
+      if (!($this->auditing_readback_disabled)) {
+        if (
+          ($created) or
+          (isset($this->old_rows[$table][$row[$table . '_id']]))
+        ) {
+          $this->new_rows[$table][$row[$table . '_id']] = $row;
+        } else {
+          $this->old_rows[$table][$row[$table . '_id']] = $row;
+        }
+      }
     }
     return $results;
+  }
+  public function update($table, $attributes) {
+    $this->start_transaction();
+    if ($all_numeric_keys = $this->all_numeric_keys($attributes)) {
+      $updates = $attributes;
+    } else {
+      $updates = array($attributes);
+    }
+    $ids = array();
+    foreach ($updates as &$update) {
+      $ids[] = $update[$table . '_id'];
+    }
+    if (!($this->auditing_readback_disabled)) {
+      $this->read($table, $ids);
+    }
+    foreach ($updates as &$update) {
+      $id = $update[$table . '_id'];
+      unset($update[$table . '_id']);
+      if ($update) {
+        $query = 'update ' . $this->word($table) . ' set ' . implode(',',
+          array_map(
+            array(
+              $this,
+              'column_equals_value'
+            ),
+            array_keys($update),
+            array_values($update)
+          )
+        ) . ' where ' . $this->word($table . '_id') . ' = ' . intval($id) . '';
+        $this->query_($query);
+      }
+    }
+    if ($this->auditing_readback_disabled) {
+      if ($all_numeric_keys) {
+        return $ids;
+      } else {
+        foreach ($ids as $id) {
+          return $id;
+        }
+      }
+    } else {
+      if ($all_numeric_keys) {
+        $indexed_results = $this->read($table, $ids);
+        $ordered_results = array();
+        foreach ($ids as $id) {
+          $ordered_results[] = $indexed_results[$id];
+        }
+        return $ordered_results;
+      } else {
+        return $this->get($table, $ids);
+      }
+    }
   }
   public function get($table, $id_or_attributes) {
     if (is_numeric($id_or_attributes)) {
@@ -140,38 +276,9 @@ class database extends mysqli {
     } else {
       $attributes = $id_or_attributes;
     }
-    foreach ($this->select($table, $attributes) as $result) {
+    foreach ($this->read($table, $attributes) as $result) {
       return $result;
     }
-  }
-  public function insert($table, $attributes) {
-    $this->start_transaction();
-    $query = 
-      'insert into ' . $this->word($table) . ' ' . 
-      ' (' . implode(',', array_map(array($this, 'word'), array_keys($attributes))) . ') ' .
-      'values ' .
-      '(' . implode(',', array_map(array($this, 'escape_if'), $attributes)) . ')';
-    $this->query($query);
-    return $this->get($table, $this->insert_id);
-  }
-  public function update($table, $attributes) {
-    $id = $attributes[$table . '_id'];
-    unset($attributes[$table . '_id']);
-    if ($attributes) {
-      $this->start_transaction();
-      $query = 'update ' . $this->word($table) . ' set ' . implode(',',
-        array_map(
-          array(
-            $this,
-            'column_equals_value'
-          ),
-          array_keys($attributes),
-          array_values($attributes)
-        )
-      ) . ' where ' . $this->word($table . '_id') . ' = ' . intval($id) . '';
-      $this->query($query);
-    }
-    return $this->get($table, $id);
   }
 
 }

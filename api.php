@@ -14,7 +14,12 @@ class api {
     }
     $this->database = self::$database_instance;
   }
-  protected function call($class, $function/* , $var_args */) {
+  public static function commit() {
+    if (isset(self::$database_instance)) {
+      self::$database_instance->commit();
+    }
+  }
+  protected function api($class, $function/* , $var_args */) {
     return call_user_func_array(
       array(class_exists($class) ? new $class() : new crud($class), $function),
       array_slice(func_get_args(), 2)

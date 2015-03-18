@@ -8,6 +8,7 @@ abstract class configuration {
   public static $database_name = 'example';
   
   public static $database_root_column = 'user';
+  public static $database_root_database = false;
   
   public static $additional_login_columns = array('client_id');
   

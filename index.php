@@ -8,6 +8,5 @@ set_include_path(
 spl_autoload_register('spl_autoload', false);
 
 if (isset($_REQUEST['class']) and isset($_REQUEST['function']) and isset($_REQUEST['arguments'])) {
-  $request = new request();
-  $request->json($_REQUEST['class'], $_REQUEST['function'], $_REQUEST['arguments']);
+  new request_json($_REQUEST);
 }

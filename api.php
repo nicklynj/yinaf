@@ -29,7 +29,7 @@ class api {
     $results = array();
     foreach ($arguments as $argument) {
       $results[isset($argument['alias']) ? $argument['alias'] : $argument['class']] =
-        $this->call(
+        $this->api(
           $argument['class'], 
           $argument['function'], 
           $this->replacer($argument['arguments'], $results)
@@ -38,10 +38,12 @@ class api {
     return $results;
   }
   private function replacer($arguments, $results) {
-    foreach ($arguments as $key => $value) {
-      if (substr($value, 0, 1) === '=') {
-        $arguments[$this->get_replacement($key, $results)] =
-          $this->get_replacement($key, $results);
+    if (is_array($arguments)) {
+      foreach ($arguments as $key => $value) {
+        if (substr($value, 0, 1) === '=') {
+          $arguments[$this->get_replacement($key, $results)] =
+            $this->get_replacement($key, $results);
+        }
       }
     }
     return $arguments;

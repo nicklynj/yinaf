@@ -73,7 +73,7 @@ class database extends mysqli {
       $this->transaction_started = false;
     }
   }
-  private function query_($str) {
+  private function query_($str) { var_dump($str);
     ++$this->number_of_queries;
     $this->query_time -= microtime(true);
     $result = parent::query($str);
@@ -174,8 +174,25 @@ class database extends mysqli {
   public function read($table, $ids_or_attributes, $created = false) {
     $this->start_transaction();
     if ($this->all_numeric_keys($ids_or_attributes)) {
+      $ids = $ids_or_attributes;
+      if (!(
+        array_diff($ids, 
+          (isset($this->new_rows[$table]) ? array_keys($this->new_rows[$table]) : array()),
+          (isset($this->old_rows[$table]) ? array_keys($this->old_rows[$table]) : array())
+        )
+      )) {
+        $results = array();
+        foreach ($ids as $id) {
+          if (isset($this->new_rows[$table][$id])) {
+            $results[$id] = $this->new_rows[$table][$id];
+          } else {
+            $results[$id] = $this->old_rows[$table][$id];
+          }
+        }
+        return $results;
+      }
       $attributes = array(
-        $table . '_id' => $ids_or_attributes,
+        $table . '_id' => $ids,
       );
     } else {
       $attributes = $ids_or_attributes;

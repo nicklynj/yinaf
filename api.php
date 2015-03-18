@@ -3,6 +3,7 @@
 class api {
   private static $database_instance;
   protected $database;
+  protected $class_name;
   public function __construct() {
     if (!isset(self::$database_instance)) {
       self::$database_instance = new database(
@@ -12,6 +13,7 @@ class api {
         configuration::$database_name
       );
     }
+    $this->class_name = get_class($this);
     $this->database = self::$database_instance;
   }
   public static function commit() {

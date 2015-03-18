@@ -8,7 +8,7 @@ class authenticated extends api {
       throw new Exception('unauthenticated');
     }
     if (configuration::$database_root_database) {
-      $this->database->select_db();
+      // $this->database->select_db();
     }
   }
 }

@@ -17,4 +17,15 @@ class request extends api {
     }
   }
   
+  protected function error($str_exception) {
+    if (isset($this->database)) {
+      $this->database->disable_commits();
+    }
+    if (is_string($str_exception)) {
+      throw new Exception($str_exception);
+    } else {
+      throw $str_exception;
+    }
+  }
+  
 }

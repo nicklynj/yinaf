@@ -1,17 +1,10 @@
 <?php
 
 class crud extends authenticated {
-  protected $class_name;
-  private $session;
   public function __construct($opt_class = null) {
     parent::__construct();
-    if (!($this->session = $this->api('user', 'resume'))) {
-      throw new Exception('You are not logged in!');
-    }
     if ($opt_class) {
       $this->class_name = $opt_class;
-    } else {
-      $this->class_name = get_class($this);
     }
   }
   public function create($attributes) {

@@ -1,6 +1,6 @@
 <?php
 
-class crud extends api {
+class crud extends authenticated {
   protected $class_name;
   public function __construct($opt_class = null) {
     parent::__construct();

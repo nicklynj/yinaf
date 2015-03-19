@@ -8,9 +8,10 @@ abstract class configuration {
   public static $database_name = 'example';
   
   public static $database_root_column = 'user';
-  public static $database_root_database = false;
+  public static $database_user_client = false;
+  public static $database_client_prefix = null;
   
-  public static $additional_login_columns = array('client_id');
+  public static $login_additional_columns = array('client_id');
   
   public static $session_max_life = 86400 * 90;
     
@@ -19,5 +20,7 @@ abstract class configuration {
   public static $user_updatable_columns_black_list = array();
   public static $user_track_failed_logins = false;
   public static $user_max_failed_logins = null;
+  
+  public static $audit_additional_columns = array();
 
 }

@@ -90,6 +90,34 @@ class database extends mysqli {
   private function all_numeric_keys($attributes) {
     return (!(in_array(false, array_map('is_int', array_keys($attributes)), true)));
   }
+  private function get_clause_from_attributes($table, $ids_or_attributes) {
+    if ($this->all_numeric_keys($ids_or_attributes)) {
+      $attributes = array(
+        $table . '_id' => $ids_or_attributes,
+      );
+    } else {
+      $attributes = $ids_or_attributes;
+    }
+    $clauses = array();
+    foreach ($attributes as $key => $value) {
+      $clause = $this->word($key);
+      if (is_array($value)) {
+        if ($value) {
+          $clause .= ' in (' . implode(',',
+              array_map(array($this, 'escape_if'), $value)
+            ) . ')';
+        } else {
+          return array();
+        }
+      } else if ($value === null) {
+        $clause .= ' is null';
+      } else {
+        $clause .= '=' . $this->escape_if($value);
+      }
+      $clauses[] = $clause;
+    }
+    return '(' . implode(') and (', $clauses) . ')';
+  }
   
   function __destruct() {
     $this->commit_transaction();
@@ -114,7 +142,7 @@ class database extends mysqli {
     $this->caching_disabled = true;
   }
   public function enable_caching() {
-    $this->caching_enabled = true;
+    $this->caching_disabled = false;
   }
   
   public function get_number_of_queries() {
@@ -132,8 +160,6 @@ class database extends mysqli {
   public function escape($str) {
     if ($str === null) {
       return 'null';
-    } else if (is_int($str)) {
-      return $str;
     } else {
       return '"' . $this->real_escape_string($str) . '"';
     }
@@ -176,7 +202,7 @@ class database extends mysqli {
       if ($all_numeric_keys) {
         return array_values($this->read($table, $ids, true));
       } else {
-        return $this->get($table, $ids);
+        return $this->get($table, $ids, true);
       }
     }
   }
@@ -201,33 +227,10 @@ class database extends mysqli {
         }
         return $results;
       }
-      $attributes = array(
-        $table . '_id' => $ids,
-      );
-    } else {
-      $attributes = $ids_or_attributes;
-    }
-    $clauses = array();
-    foreach ($attributes as $key => $value) {
-      $clause = $this->word($key);
-      if (is_array($value)) {
-        if ($value) {
-          $clause .= ' in (' . implode(',',
-              array_map(array($this, 'escape_if'), $value)
-            ) . ')';
-        } else {
-          return array();
-        }
-      } else if ($value === null) {
-        $clause .= ' is null';
-      } else {
-        $clause .= '=' . $this->escape_if($value);
-      }
-      $clauses[] = $clause;
     }
     $query =
       'select * from ' . $this->word($table) . ' ' .
-      'where (' . implode(') and (', $clauses) . ')';
+      'where ' . $this->get_clause_from_attributes($table, $ids_or_attributes);
     $result = $this->query_($query);
     $results = array();
     while ($row = $result->fetch_assoc()) {
@@ -248,7 +251,7 @@ class database extends mysqli {
     }
     return $results;
   }
-  public function update($table, $attributes) {
+  public function update($table, $attributes, $where_clause = array()) {
     $this->start_transaction();
     if ($all_numeric_keys = $this->all_numeric_keys($attributes)) {
       $updates = $attributes;
@@ -266,6 +269,7 @@ class database extends mysqli {
       $id = $update[$table . '_id'];
       unset($update[$table . '_id']);
       if ($update) {
+        $clauses = array();
         $query = 'update ' . $this->word($table) . ' set ' . implode(',',
           array_map(
             array(
@@ -275,7 +279,9 @@ class database extends mysqli {
             array_keys($update),
             array_values($update)
           )
-        ) . ' where ' . $this->word($table . '_id') . ' = ' . intval($id) . '';
+        ) . ' where ' . $this->get_clause_from_attributes($table, array(
+          $table . '_id' => $id,
+        ) + $where_clause);
         $this->query_($query);
       }
     }
@@ -296,17 +302,17 @@ class database extends mysqli {
         }
         return $ordered_results;
       } else {
-        return $this->get($table, $ids);
+        return $this->get($table, $ids, true);
       }
     }
   }
-  public function get($table, $id_or_attributes) {
+  public function get($table, $id_or_attributes, $updated = false) {
     if (is_numeric($id_or_attributes)) {
       $attributes = array($id_or_attributes);
     } else {
       $attributes = $id_or_attributes;
     }
-    foreach ($this->read($table, $attributes) as $result) {
+    foreach ($this->read($table, $attributes, $updated) as $result) {
       return $result;
     }
   }

@@ -16,6 +16,9 @@ class api {
     $this->class_name = get_class($this);
     $this->database = self::$database_instance;
   }
+  public function get_class_name() {
+    return $this->class_name;
+  }
   public static function commit() {
     if (isset(self::$database_instance)) {
       self::$database_instance->commit();

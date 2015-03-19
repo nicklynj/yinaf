@@ -17,7 +17,7 @@ class user extends api {
     if (
       $user = $this->database->get('user', array(
         'username' => $arguments['username'],
-      ) + array_intersect_key($arguments, array_flip(configuration::$additional_login_columns)))
+      ) + array_intersect_key($arguments, array_flip(configuration::$login_additional_columns)))
     ) {
       return $user;
     }
@@ -56,16 +56,50 @@ class user extends api {
       ) + $session);
     }
   }
-  public function resume() {
-    if (
-      ($session = $this->database->get('session', array(
-        'key' => $_REQUEST['key'],
-        // 'destroyed' => 0,
-      ))) and
-      ((time() - strtotime($session['created_at'])) < configuration::$session_max_life)
-    ) {
-      return $session;
+  private static $memo_session;
+  private function get_session() {
+    if (!isset(self::$memo_session)) {
+      $request = request::get_last_request();
+      if ($request->get_class_name() === 'request_json') {
+        if (
+          ($session = $this->database->get('session', array(
+            'key' => $request->get_requested('key'),
+            // 'destroyed' => 0,
+          ))) and
+          ((time() - strtotime($session['created_at'])) < configuration::$session_max_life)
+        ) {
+          self::$memo_session = $session;
+        }  
+      } else {
+        self::$memo_session = array(
+          'user_id' => $request->get_user_id(),
+        );
+      }
     }
+    return self::$memo_session;
+  }
+  private static $memo_resume;
+  public function resume() {
+    if (!isset(self::$memo_resume)) {
+      if ($session = $this->get_session()) {
+        if (configuration::$database_user_client) {
+          $client_id = request::get_last_request()->get_requested('client_id');
+          if ($this->database->get('user_client', array(
+            'user_id' => $session['user_id'],
+            'client_id' => $client_id,
+            'deleted' => 0,
+          ))) {
+            $this->database->select_db(
+              configuration::$database_client_prefix . '_' . $client_id
+            );
+            self::$memo_resume = $session;
+          }
+        } else {
+          self::$memo_resume = $session;
+        }
+      }
+    }
+    return self::$memo_resume;
   }
   public function update_password($arguments) {
     if ($session = $this->resume()) {

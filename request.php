@@ -3,9 +3,15 @@
 class request extends api {
   
   protected $request;
+  private static $last_request;
   
   public function __construct($request) {
     $this->request = $request;
+    self::$last_request = $this;
+  }
+  
+  public static function get_last_request() {
+    return self::$last_request;
   }
   
   public function handle($class, $function, $arguments) {
@@ -15,6 +21,10 @@ class request extends api {
     } catch (Exception $e) {
       $this->error($e);
     }
+  }
+  
+  public function get_requested($key) {
+    return $this->request[$key];
   }
   
   protected function error($str_exception) {

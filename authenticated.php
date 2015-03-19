@@ -7,8 +7,5 @@ class authenticated extends api {
     if (!($this->session = $this->api('user', 'resume'))) {
       throw new Exception('unauthenticated');
     }
-    if (configuration::$database_root_database) {
-      // $this->database->select_db();
-    }
   }
 }

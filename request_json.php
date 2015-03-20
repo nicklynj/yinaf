@@ -22,6 +22,11 @@ class request_json extends request {
             $request['function'], 
             json_decode($request['arguments'], true)
           ),
+        )+ (configuration::$debug ?
+          array(
+            'queries' => $this->database->get_queries(),
+          ) : 
+          array()
         ));
         api::commit();
         die($result);

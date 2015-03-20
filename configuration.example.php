@@ -2,6 +2,8 @@
 
 abstract class configuration {
   
+  public static $debug = false;
+  
   public static $database_username = 'user';
   public static $database_password = 'password';
   public static $database_host = 'example.com';

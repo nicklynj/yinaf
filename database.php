@@ -2,6 +2,7 @@
 
 class database extends mysqli {
 
+  private $queries;
   private $transaction_started = false;
   private $commits_disabled = false;
   private $readback_disabled = false;
@@ -22,6 +23,7 @@ class database extends mysqli {
       $query = 'start transaction';
       $this->query_($query);
       $this->transaction_started = true;
+      $this->queries = array();
     }
   }
   private function commit_transaction() {
@@ -61,17 +63,36 @@ class database extends mysqli {
       $query = 'commit';
       $this->query_($query);
       $this->transaction_started = false;
+      $this->queries = array();
     }
   }
   private function query_($str) {
-    if ($result = parent::query($str)) {
-      return $result;
+    if (configuration::$debug) {
+      $start = microtime(true);
+      $result = parent::query($str);
+      $this->queries[] = array(
+        'time' => round(microtime(true) - $start, 4),
+        'string' => preg_replace('/[^\x09\x0A\x0D(\x20-\x7F)]+/', '?', $str),
+        'num_rows' => isset($result->num_rows) ? $result->num_rows : null,
+        'info' => $this->info,
+        'affected_rows' => $this->affected_rows,
+      );
+      if ($result) {
+        return $result;
+      } else {
+        throw new Exception($this->error . ':' . $str);
+      }
     } else {
-      throw new Exception($this->error . ':' . $str);
+      if ($result = parent::query($str)) {
+        return $result;
+      } else {
+        throw new Exception($this->error . ':' . $str);
+      }
     }
   }
   private function all_numeric_keys($attributes) {
-    return (!(in_array(false, array_map('is_int', array_keys($attributes)), true)));
+    return ($attributes) and 
+      (!(in_array(false, array_map('is_int', array_keys($attributes)), true)));
   }
   private function get_clause_from_attributes($table, $ids_or_attributes) {
     if ($this->all_numeric_keys($ids_or_attributes)) {
@@ -99,7 +120,9 @@ class database extends mysqli {
       }
       $clauses[] = $clause;
     }
-    return '(' . implode(') and (', $clauses) . ')';
+    return $clauses ? 
+      '(' . implode(') and (', $clauses) . ')' : 
+      '1';
   }
   private function escape($str, $column = '') {
     if ($str === null) {
@@ -122,6 +145,10 @@ class database extends mysqli {
   public function __construct() {
     call_user_func_array(array($this, 'parent::__construct'), func_get_args());
     $this->start_transaction();
+  }
+  
+  public function get_queries() {
+    return $this->queries;
   }
   
   public function disable_commits() {
@@ -247,6 +274,9 @@ class database extends mysqli {
   }
   public function update($table, $attributes, $where_clause = array()) {
     $this->start_transaction();
+    if (!$attributes) {
+      return array();
+    }
     if ($all_numeric_keys = $this->all_numeric_keys($attributes)) {
       $updates = $attributes;
     } else {

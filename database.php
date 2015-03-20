@@ -72,7 +72,7 @@ class database extends mysqli {
       $this->transaction_started = false;
     }
   }
-  private function query_($str) {  var_dump($str);
+  private function query_($str) {
     if ($result = parent::query($str)) {
       return $result;
     } else {

@@ -26,46 +26,6 @@ class database extends mysqli {
       $this->queries = array();
     }
   }
-  private function commit_transaction() {
-    if (
-      ($this->transaction_started) and
-      (!$this->commits_disabled)
-    ) {
-      if (class_exists('audit')) {
-        foreach ($this->old_rows as $table => &$rows) {
-          if (isset($this->new_rows[$table])) {
-            foreach ($rows as $id => &$row) {
-              if (isset($this->new_rows[$table][$id])) {
-                $this->new_rows[$table][$id] = array_diff_assoc(
-                  $this->new_rows[$table][$id],
-                  $row
-                );
-                $row = array_intersect_key(
-                  $row,
-                  $this->new_rows[$table][$id]
-                );
-              } else {
-                unset($this->old_rows[$table][$id]);
-              }
-              unset($row);
-            }
-          } else {
-            unset($this->old_rows[$table]);
-          }
-          unset($rows);
-        }
-        $this->disable_readback();
-        new audit($this->old_rows, $this->new_rows);
-        $this->enable_readback();
-      }
-      $this->old_rows = array();
-      $this->new_rows = array();
-      $query = 'commit';
-      $this->query_($query);
-      $this->transaction_started = false;
-      $this->queries = array();
-    }
-  }
   private function query_($str) {
     if (configuration::$debug) {
       $start = microtime(true);
@@ -171,8 +131,45 @@ class database extends mysqli {
     throw new Exception('query disabled');
   }
 
-  public function commit() {
-    $this->commit_transaction();
+  public function commit_transaction() {
+    if (
+      ($this->transaction_started) and
+      (!$this->commits_disabled)
+    ) {
+      if (class_exists('audit')) {
+        foreach ($this->old_rows as $table => &$rows) {
+          if (isset($this->new_rows[$table])) {
+            foreach ($rows as $id => &$row) {
+              if (isset($this->new_rows[$table][$id])) {
+                $this->new_rows[$table][$id] = array_diff_assoc(
+                  $this->new_rows[$table][$id],
+                  $row
+                );
+                $row = array_intersect_key(
+                  $row,
+                  $this->new_rows[$table][$id]
+                );
+              } else {
+                unset($this->old_rows[$table][$id]);
+              }
+              unset($row);
+            }
+          } else {
+            unset($this->old_rows[$table]);
+          }
+          unset($rows);
+        }
+        $this->disable_readback();
+        new audit($this->old_rows, $this->new_rows);
+        $this->enable_readback();
+      }
+      $this->old_rows = array();
+      $this->new_rows = array();
+      $query = 'commit';
+      $this->query_($query);
+      $this->transaction_started = false;
+      $this->queries = array();
+    }
   }
   
   public function create($table, $attributes) {

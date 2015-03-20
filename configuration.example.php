@@ -17,7 +17,7 @@ abstract class configuration {
   
   public static $login_additional_columns = array('client_id');
   
-  public static $session_max_life = 86400 * 90;
+  public static $session_max_life = 7776000;
     
   public static $user_updatable = true;
   public static $user_updatable_columns_white_list = array();

@@ -54,6 +54,7 @@ class user extends api {
     if (!isset(self::$session)) {
       $request = request::get_last_request();
       if ($request->get_class_name() === 'request_json') {
+        date_default_timezone_set('America/New_York');
         if (
           ($session = $this->database->get('session', array(
             'key' => $request->get_requested('key'),

@@ -105,6 +105,11 @@ cache.prototype.read_results_ = function(caches, table, ids) {
       }
     }
   }
+  for (var id in results) {
+    if (+results[id].deleted) {
+      delete results[id];
+    }
+  }
   return results;
 };
 
@@ -286,7 +291,7 @@ cache.prototype.flush_get_updates = function(calls, alias_to_table) {
         calls.push({
           'alias': alias_to_table.length,
           'class': table,
-          'function': 'update_2015',
+          'function': 'update',
           'arguments': rocket.extend(
             rocket.object(
               table + '_id',
@@ -332,7 +337,7 @@ cache.prototype.flush_get_updates_from_negative_pointers = function(calls, alias
       calls.push({
         'alias': alias_to_table.length,
         'class': pointer.table,
-        'function': 'update_2015',
+        'function': 'update',
         'arguments': rocket.extend(
           rocket.object(pointer.table + '_id', id),
           rocket.object(pointer.column, value)

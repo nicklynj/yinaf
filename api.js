@@ -12,20 +12,15 @@ var api = function() {
 api.prototype.url = 'yinaf/';
 
 
-api.prototype.get_data = function(cls, fnct, opt_args, opt_success, opt_xhr) {
-  return {
-    'class': cls,
-    'function': fnct,
-    'arguments': rocket.JSON.stringify((opt_args === undefined) ? null : opt_args)
-  };
-};
-
-
 api.prototype.request = function(cls, fnct, opt_args, opt_success, opt_xhr) {
 
   var xhr = opt_xhr || (new rocket.XMLHttpRequest());
 
-  xhr.data = this.get_data.apply(this, arguments);
+  xhr.data = {
+    'class': cls,
+    'function': fnct,
+    'arguments': rocket.JSON.stringify((opt_args === undefined) ? null : opt_args)
+  };
 
   xhr.open('POST', this.url);
   

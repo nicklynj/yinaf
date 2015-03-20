@@ -27,9 +27,6 @@ cache.prototype.load = function(data) {
 
 
 cache.prototype.create = function(table, attributes) {
-  if (!this.cache[table]) {
-    this.cache.table = {};
-  }
   return this.update(table, rocket.extend(
     rocket.object(table + '_id', --cache.last_insert_id), 
     attributes
@@ -49,7 +46,7 @@ cache.prototype.read = function(table, ids_or_attributes) {
   var caches = [cache.cache];
   var layers = this.get_layers();
   for (var i = 0; layers[i]; ++i) {
-    cache.caches.push(layers[i].cache);
+    caches.push(layers[i].cache);
   }
   if (rocket.equal([table + '_id'], rocket.keys(attributes))) {
     return this.read_results_(caches, table, attributes[table + '_id']);
@@ -115,17 +112,22 @@ cache.prototype.read_results_ = function(caches, table, ids) {
       }
     }
   }
+  for (var id in results) {
+    if (+results[id].deleted) {
+      delete results[id];
+    }
+  }
   return results;
 };
 
 
 cache.prototype.update = function(table, attributes) {
   var id = attributes[table + '_id'];
-  switch (undefined) {
-    case this.cache[table]:
-      this.cache[table] = {};
-    case this.cache[table][id]:
-      this.cache[table][id] = {};
+  if (!(table in this.cache)) {
+    this.cache[table] = {};
+  }
+  if (!(id in this.cache[table])) {
+    this.cache[table][id] = {};
   }
   rocket.extend(this.cache[table][id], attributes);
   return this.get(table, id);
@@ -133,18 +135,25 @@ cache.prototype.update = function(table, attributes) {
 
 
 cache.prototype.del = function(table, id) {
-  return this.update(table, {'deleted': '1'});
+  return this.update(table, rocket.extend(rocket.object(
+    table + '_id',
+    id
+  ), {'deleted': '1'}));
 };
 
 
 cache.prototype.get = function(table, id_or_attributes) {
+  var results;
   if (
     (typeof id_or_attributes === 'number') ||
     (typeof id_or_attributes === 'string')
   ) {
-    return this.read(table, [id_or_attributes]);
+    results = this.read(table, [id_or_attributes]);
   } else {
-    return this.read(table, id_or_attributes);
+    results = this.read(table, id_or_attributes);
+  }
+  for (var id in results) {
+    return results[id];
   }
 };
 
@@ -154,15 +163,17 @@ cache.prototype.flush = function(callback) {
   var negative_pointers = this.flush_remove_negative_pointers();
   var unresolved_negative_pointers = [];
   this.flush_move_unresolved_negative_pointer_rows_back(negative_pointers, unresolved_negative_pointers);
-  var aliases = [];
+  var alias_to_table = [];
   var calls = [];
-  this.flush_get_inserts(calls, aliases, negative_pointers);
-  this.flush_get_updates(calls, aliases);
-  this.flush_get_updates_from_negative_pointers(callas, aliases, negative_pointers);
+  this.flush_get_inserts(calls, alias_to_table, negative_pointers);
+  this.flush_get_updates(calls, alias_to_table);
+  this.flush_get_updates_from_negative_pointers(calls, alias_to_table, negative_pointers);
+  this.flush_collapse_updates(calls);
+  this.cache = {};
   if (calls.length) {
     var self = this;
     api('api', 'multiple', calls, function(result) {
-      self.flush_handle_result(result, aliases, negative_pointers, unresolved_negative_pointers);
+      self.flush_handle_result(result, alias_to_table, negative_pointers, unresolved_negative_pointers);
       callback();
     });
   } else {
@@ -203,7 +214,7 @@ cache.prototype.flush_remove_negative_pointers = function() {
           (column.substr(column.length - 3) === '_id') &&
           (this.cache[table][id][column] < 0)
         ) {
-          this.pointers.push({
+          pointers.push({
             'table': table,
             'id': id,
             'column': column,
@@ -236,7 +247,7 @@ cache.prototype.flush_move_unresolved_negative_pointer_rows_back = function(nega
       }
       if (!match) {
         this.flush_replace_negative_pointer(negative_pointers, pointer.table, pointer.id, unresolved_negative_pointers);
-        this.get_previous_layer().cache.update(pointer.table, this.cache[pointer.table][pointer.id]);
+        this.get_previous_layer().update(pointer.table, this.cache[pointer.table][pointer.id]);
         delete this.cache[pointer.table][pointer.id];
         return this.flush_move_unresolved_negative_pointer_rows_back(negative_pointers, unresolved_negative_pointers);
       }
@@ -259,7 +270,7 @@ cache.prototype.flush_replace_negative_pointer = function(negative_pointers, tab
 };
 
 
-cache.prototype.flush_get_inserts = function(calls, aliases, negative_pointers) {
+cache.prototype.flush_get_inserts = function(calls, alias_to_table, negative_pointers) {
   for (var table in this.cache) {
     for (var id in this.cache[table]) {
       if (id < 0) {
@@ -269,9 +280,9 @@ cache.prototype.flush_get_inserts = function(calls, aliases, negative_pointers) 
               'class': table,
               'function': 'create',
               'arguments': this.cache[table][id],
-              'alias': (negative_pointers.alias = aliases.length)
+              'alias': (negative_pointers[i].alias = alias_to_table.length)
             });
-            aliases.push(table);
+            alias_to_table.push(table);
             break;
           }
         }
@@ -281,24 +292,30 @@ cache.prototype.flush_get_inserts = function(calls, aliases, negative_pointers) 
 };
 
 
-cache.prototype.flush_get_updates = function(aliases) {
+cache.prototype.flush_get_updates = function(calls, alias_to_table) {
   for (var table in this.cache) {
     for (var id in this.cache[table]) {
       if (id > 0) {
         calls.push({
-          'alias': aliases.length
+          'alias': alias_to_table.length,
           'class': table,
-          'function': 'create',
-          'arguments': this.cache[table]
+          'function': 'update',
+          'arguments': rocket.extend(
+            rocket.object(
+              table + '_id',
+              id
+            ),
+            this.cache[table][id]
+          )
         });
-        aliases.push(table);
+        alias_to_table.push(table);
       }
     }
   }
 };
 
 
-cache.prototype.flush_get_updates_from_negative_pointers = function(calls, aliases, negative_pointers) {
+cache.prototype.flush_get_updates_from_negative_pointers = function(calls, alias_to_table, negative_pointers) {
   for (var i = 0; negative_pointers[i]; ++i) {
     var pointer = negative_pointers[i];
     if (!pointer.self) {
@@ -309,22 +326,24 @@ cache.prototype.flush_get_updates_from_negative_pointers = function(calls, alias
         for (j = 0; negative_pointers[j]; ++j) {
           if (
             (negative_pointers[j].self) &&
-            (negative_pointers[j].value === pointer.id)
+            (negative_pointers[j].value === +pointer.id)
           ) {
-            id = '=' + negative_pointers[j].alias;
+            id = '=' + negative_pointers[j].alias + '.' + pointer.table + '_id';
+            break;
           }
         }
       }
       for (var j = 0; negative_pointers[j]; ++j) {
         if (
           (negative_pointers[j].self) &&
-          (negative_pointers[j].value === negative_pointers[i].value)
+          (negative_pointers[j].value === pointer.value)
         ) {
-          var value = '=' + negative_pointers[j].alias;
+          var value = '=' + negative_pointers[j].alias + '.' + pointer.table + '_id';
+          break;
         }
       }
       calls.push({
-        'alias': aliases.length,
+        'alias': alias_to_table.length,
         'class': pointer.table,
         'function': 'update',
         'arguments': rocket.extend(
@@ -332,21 +351,37 @@ cache.prototype.flush_get_updates_from_negative_pointers = function(calls, alias
           rocket.object(pointer.column, value)
         )
       });
-      aliases.push(pointer.table);
+      alias_to_table.push(pointer.table);
     }
   }
 };
 
 
-cache.prototype.flush_handle_result = function(result, aliases, negative_pointers, unresolved_negative_pointers) {
-  for (var alias in result) {
-    if (!(aliases[alias] in cache.cache)) {
-      cache.cache = {};
+cache.prototype.flush_collapse_updates = function(calls) {
+  var map = {};
+  for (var i = 0; calls[i]; ++i) {
+    if (calls[i]['function'] === 'update') {
+      var cls = calls[i]['class'];
+      if (!(cls in map)) {
+        map[cls] = {};
+      }
+      if (calls[i][cls + '_id'] in map[cls]) {
+        rocket.extend(map[cls][calls[i][cls + '_id']], calls[i].arguments);
+        calls.splice(i--, 1);
+      } else {
+        map[cls][calls[i][cls + '_id']] = calls[i];
+      }
     }
-    rocket.extend(cache.cache, rocket.object(
-      result[alias][aliases[alias] + '_id'],
-      result[alias]
-    ));
+  }
+};
+
+
+cache.prototype.flush_handle_result = function(result, alias_to_table, negative_pointers, unresolved_negative_pointers) {
+  for (var alias in result) {
+    if (!(alias_to_table[alias] in cache.cache)) {
+      cache.cache[alias_to_table[alias]] = {};
+    }
+    cache.cache[alias_to_table[alias]][result[alias][alias_to_table[alias] + '_id']] = result[alias];
   }
 };
 
@@ -355,8 +390,9 @@ cache.prototype.flush_handle_result = function(result, aliases, negative_pointer
 
 var layer = function() {
   cache.apply(this, arguments);
-  this.get_class_names_()  
-  if (this instanceof layer) {
+  this.get_class_names_();
+  // if (this instanceof layer) {
+  if (this.class_names[0] === 'layer') {
     layer.layers.push(this);
     if (this.get_previous_layer()) {
       this.state = rocket.clone(this.get_previous_layer().state);
@@ -385,23 +421,44 @@ layer.prototype.get_layers = function() {
 
 layer.prototype.get_class_names_ = function() {
   return this.constructor.prototype.class_names = this.class_names = this.class_names || 
-    this.get_class_name_recursive_(window);
+    ['layer'].concat(this.get_class_name_recursive_(layer) || this.get_class_name_recursive_slow_(layer));
 };
 
 
 layer.prototype.get_class_name_recursive_ = function(parent, opt_prefix) {
-  var name;
   for (var i in parent) {
-    if (typeof parent[i] === 'function') {
+    if (
+      (parent[i]) &&
+      (parent[i].prototype) &&
+      (this instanceof parent[i])
+    ) {
       var name = opt_prefix ? rocket.clone(opt_prefix) : [];
       name.push(i);
       if (parent[i] === this.constructor) {
         return name;
       } else {
-        if (
-          (parent !== parent[i]) &&
-          (name = this.get_class_name_recursive_(parent[i], name))
-        ) {
+        if (name = this.get_class_name_recursive_(parent[i], name)) {
+          return name;
+        }
+      }
+    }
+  }
+};
+
+
+layer.prototype.get_class_name_recursive_slow_ = function(parent, opt_prefix) {
+  for (var i in parent) {
+    if (
+      (parent[i]) &&
+      (parent[i].prototype)
+    ) {
+      var name = opt_prefix ? rocket.clone(opt_prefix) : [];
+      name.push(i);
+      if (parent[i] === this.constructor) {
+        return name;
+      } else {
+        console.log(i);
+        if (name = this.get_class_name_recursive_slow_(parent[i], name)) {
           return name;
         }
       }
@@ -432,10 +489,10 @@ layer.prototype.render = function(opt_parent) {
     ) {
       this.layer_previous_container_.parentNode().replaceChild(containers[0], this.layer_previous_container_);
     } else {
-      (opt_parent || $('body').innerHTML('')).appendChild(containers[0]);
+      (opt_parent || rocket.$('body').innerHTML('')).appendChild(containers[0]);
     }
     this.layer_previous_container_ = containers[0];
-    this.dispatchEvent('rendered');
+    this.dispatchEvent('render');
   }
 };
 
@@ -457,6 +514,7 @@ layer.prototype.render_previous = function(opt_cancel) {
   }
 };
 
+
 layer.prototype.render_clear = function() {
   this.render();
   layer.layers = [this];
@@ -474,7 +532,18 @@ component.prototype.decorate = function() {};
 
 
 
-var api = function(cls, fnct, opt_args, opt_success, opt_xhr) {
+var api = function() {
+  if (!(this instanceof api)) {
+    var obj = new api();
+    return obj.request.apply(obj, arguments)
+  }
+};
+
+
+api.prototype.url = 'yinaf/';
+
+
+api.prototype.request = function(cls, fnct, opt_args, opt_success, opt_xhr) {
 
   var xhr = opt_xhr || (new rocket.XMLHttpRequest());
 
@@ -484,7 +553,7 @@ var api = function(cls, fnct, opt_args, opt_success, opt_xhr) {
     'arguments': rocket.JSON.stringify((opt_args === undefined) ? null : opt_args)
   };
 
-  xhr.open('POST', 'moxee_api');
+  xhr.open('POST', this.url);
   
   xhr.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
 
@@ -496,7 +565,7 @@ var api = function(cls, fnct, opt_args, opt_success, opt_xhr) {
           opt_success(response.result);
         }
       } else {
-        throw response.error;
+        throw response.result;
       }
     } catch (e) {
       if (error) {
@@ -507,7 +576,7 @@ var api = function(cls, fnct, opt_args, opt_success, opt_xhr) {
   
   xhr.addEventListener('error', function() {
     if (error) {
-      error('XMLHttpRequest failure');
+      error({'message': 'XMLHttpRequest failure'});
     }
   });
 
@@ -517,6 +586,6 @@ var api = function(cls, fnct, opt_args, opt_success, opt_xhr) {
 
 
 
-var error = function(str) {
-  alert('error:"' + str + '"');
+var error = function(err) {
+  alert('error:"' + err.message + '"');
 };

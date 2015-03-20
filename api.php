@@ -44,20 +44,22 @@ class api {
   }
   private function replacer($arguments, $results) {
     if (is_array($arguments)) {
-      foreach ($arguments as $key => $value) {
-        if (substr($value, 0, 1) === '=') {
-          $arguments[$this->get_replacement($key, $results)] =
-            $this->get_replacement($key, $results);
+      foreach ($arguments as $key => &$value) {
+        if (
+          (is_string($value)) and
+          (substr($value, 0, 1) === '=')
+        ) {
+          $value = $this->get_replacement($value, $results);
         }
       }
     }
     return $arguments;
   }
-  private function get_replacement($str, $results) {
-    $columns = preg_split('/[\.\[]/', str_replace(']', '', substr($str, 1)));
+  private function get_replacement($value, $results) {
+    $columns = preg_split('/[\.\[]/', str_replace(']', '', substr($value, 1)));
     $replace = $results;
     for ($i = 0; isset($columns[$i]); ++$i) {
-      if ($columns[$i]) {
+      if (strlen($columns[$i])) {
         $replace = $replace[$columns[$i]];
       } else {
         $replace = array_column($replace, $columns[++$i]);

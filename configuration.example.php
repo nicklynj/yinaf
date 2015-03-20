@@ -24,7 +24,5 @@ abstract class configuration {
   public static $user_updatable_columns_black_list = array();
   public static $user_track_failed_logins = false;
   public static $user_max_failed_logins = null;
-  
-  public static $audit_additional_columns = array();
 
 }

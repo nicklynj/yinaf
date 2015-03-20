@@ -3,8 +3,9 @@
 
 var layer = function() {
   cache.apply(this, arguments);
-  this.get_class_names_()  
-  if (this instanceof layer) {
+  this.get_class_names_();
+  // if (this instanceof layer) {
+  if (this.class_names[0] === 'layer') {
     layer.layers.push(this);
     if (this.get_previous_layer()) {
       this.state = rocket.clone(this.get_previous_layer().state);
@@ -33,7 +34,7 @@ layer.prototype.get_layers = function() {
 
 layer.prototype.get_class_names_ = function() {
   return this.constructor.prototype.class_names = this.class_names = this.class_names || 
-    this.get_class_name_recursive_(window);
+    ['layer'].concat(this.get_class_name_recursive_(layer) || this.get_class_name_recursive_slow_(layer));
 };
 
 
@@ -50,6 +51,27 @@ layer.prototype.get_class_name_recursive_ = function(parent, opt_prefix) {
         return name;
       } else {
         if (name = this.get_class_name_recursive_(parent[i], name)) {
+          return name;
+        }
+      }
+    }
+  }
+};
+
+
+layer.prototype.get_class_name_recursive_slow_ = function(parent, opt_prefix) {
+  for (var i in parent) {
+    if (
+      (parent[i]) &&
+      (parent[i].prototype)
+    ) {
+      var name = opt_prefix ? rocket.clone(opt_prefix) : [];
+      name.push(i);
+      if (parent[i] === this.constructor) {
+        return name;
+      } else {
+        console.log(i);
+        if (name = this.get_class_name_recursive_slow_(parent[i], name)) {
           return name;
         }
       }

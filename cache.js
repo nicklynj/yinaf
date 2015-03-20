@@ -161,6 +161,7 @@ cache.prototype.flush = function(callback) {
   this.flush_get_inserts(calls, alias_to_table, negative_pointers);
   this.flush_get_updates(calls, alias_to_table);
   this.flush_get_updates_from_negative_pointers(calls, alias_to_table, negative_pointers);
+  this.flush_collapse_updates(calls);
   this.cache = {};
   if (calls.length) {
     var self = this;
@@ -344,6 +345,25 @@ cache.prototype.flush_get_updates_from_negative_pointers = function(calls, alias
         )
       });
       alias_to_table.push(pointer.table);
+    }
+  }
+};
+
+
+cache.prototype.flush_collapse_updates = function(calls) {
+  var map = {};
+  for (var i = 0; calls[i]; ++i) {
+    if (calls[i]['function'] === 'update') {
+      var cls = calls[i]['class'];
+      if (!(cls in map)) {
+        map[cls] = {};
+      }
+      if (calls[i][cls + '_id'] in map[cls]) {
+        rocket.extend(map[cls][calls[i][cls + '_id']], calls[i].arguments);
+        calls.splice(i--, 1);
+      } else {
+        map[cls][calls[i][cls + '_id']] = calls[i];
+      }
     }
   }
 };

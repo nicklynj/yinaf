@@ -4,6 +4,7 @@ class api {
   private static $database_instance;
   protected $database;
   protected $class_name;
+  private static $calls = array();
   public function __construct() {
     if (!isset(self::$database_instance)) {
       self::$database_instance = new database(
@@ -19,16 +20,37 @@ class api {
   public function get_class_name() {
     return $this->class_name;
   }
+  public static function get_calls() {
+    return self::$calls;
+  }
   public static function commit() {
     if (isset(self::$database_instance)) {
       self::$database_instance->commit();
     }
   }
   protected function api($class, $function/* , $var_args */) {
-    return call_user_func_array(
+    if (configuration::$debug) {
+      $start = microtime(true);
+      $call = array();
+      self::$calls[] = &$call;
+      $calls_length = count(self::$calls);
+    }
+    $result = call_user_func_array(
       array(class_exists($class) ? new $class() : new crud($class), $function),
       array_slice(func_get_args(), 2)
     );
+    if (configuration::$debug) {
+      $time = round(microtime(true) - $start, 4);
+      $call += array(
+        'class' => $class,
+        'function' => $function,
+        'total_time' => $time,
+        'own_time' => isset(self::$calls[$calls_length]) ?
+          $time - array_sum(array_column(array_slice(self::$calls, $calls_length), 'own_time')) :
+          $time
+      );
+    }
+    return $result;
   }
   public function multiple($arguments) {
     $results = array();

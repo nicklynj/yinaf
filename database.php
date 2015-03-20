@@ -76,6 +76,7 @@ class database extends mysqli {
         'num_rows' => isset($result->num_rows) ? $result->num_rows : null,
         'info' => $this->info,
         'affected_rows' => $this->affected_rows,
+        'api_call_i' => count(api::get_calls()) - 1,
       );
       if ($result) {
         return $result;

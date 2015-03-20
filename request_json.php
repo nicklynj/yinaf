@@ -25,6 +25,7 @@ class request_json extends request {
         )+ (configuration::$debug ?
           array(
             'queries' => $this->database->get_queries(),
+            'calls' => api::get_calls(),
           ) : 
           array()
         ));

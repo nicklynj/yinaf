@@ -3,7 +3,6 @@
 class database extends mysqli {
 
   private $transaction_started = false;
-  private $escaping_disabled = false;
   private $commits_disabled = false;
   private $readback_disabled = false;
   private $old_rows = array();
@@ -15,15 +14,8 @@ class database extends mysqli {
       throw new Exception('invalid word');
     }
   }
-  private function escape_if($str) {
-    if ($this->escaping_disabled) {
-      return $str;
-    } else {
-      return $this->escape($str);
-    }
-  }
   private function column_equals_value($column, $value) {
-    return $this->word($column) . '=' . $this->escape_if($value);
+    return $this->word($column) . '=' . $this->escape($value, $column);
   }
   private function start_transaction() {
     if (!$this->transaction_started) {
@@ -64,7 +56,6 @@ class database extends mysqli {
         new audit($this->old_rows, $this->new_rows);
         $this->enable_readback();
       }
-      
       $this->old_rows = array();
       $this->new_rows = array();
       $query = 'commit';
@@ -96,7 +87,7 @@ class database extends mysqli {
       if (is_array($value)) {
         if ($value) {
           $clause .= ' in (' . implode(',',
-              array_map(array($this, 'escape_if'), $value)
+              array_map(array($this, 'escape'), $value)
             ) . ')';
         } else {
           return array();
@@ -104,12 +95,26 @@ class database extends mysqli {
       } else if ($value === null) {
         $clause .= ' is null';
       } else {
-        $clause .= '=' . $this->escape_if($value);
+        $clause .= '=' . $this->escape($value);
       }
       $clauses[] = $clause;
     }
     return '(' . implode(') and (', $clauses) . ')';
   }
+  private function escape($str, $column = '') {
+    if ($str === null) {
+      return 'null';
+    } else {
+      if (strpos($column, 'json') !== false) {
+        $str = json_encode($str);
+      }
+      if (strpos($column, 'compressed') !== false) {
+        $str = pack('H*', str_pad(dechex(strlen($str)), 8, '0')) . gzcompress($str);
+      }
+      return '"' . $this->real_escape_string($str) . '"';
+    }
+  }
+  
   
   public function __destruct() {
     $this->commit_transaction();
@@ -119,12 +124,6 @@ class database extends mysqli {
     $this->start_transaction();
   }
   
-  public function disable_escaping() {
-    $this->escaping_disabled = true;
-  }
-  public function enable_escaping() {
-    $this->escaping_disabled = false;
-  }
   public function disable_commits() {
     $this->commits_disabled = true;
   }
@@ -138,14 +137,6 @@ class database extends mysqli {
   public function uuid() {
     $result = $this->query_('select uuid()');
     return $result['uuid()'];
-  }
-  
-  public function escape($str) {
-    if ($str === null) {
-      return 'null';
-    } else {
-      return '"' . $this->real_escape_string($str) . '"';
-    }
   }
   
   public function query($str) {
@@ -170,13 +161,14 @@ class database extends mysqli {
     }
     $ids = array();
     foreach ($attributes_indexed as $index => &$attribute_indexed) {
+      $columns = json_decode($index, true);
       $query = 
         'insert into ' . $this->word($table) . ' ' . 
         ' (' . implode(',', array_map(array($this, 'word'), array_keys($attribute_indexed[0]))) . ') ' .
           'values ';
       $inserts = array();
       for ($i = 0; isset($attribute_indexed[$i]); ++$i) {
-        $inserts[] = '(' . implode(',', array_map(array($this, 'escape_if'), $attribute_indexed[$i])) . ')';
+        $inserts[] = '(' . implode(',', array_map(array($this, 'escape'), $attribute_indexed[$i], $columns)) . ')';
       }
       $this->query_($query . implode(',', $inserts));
       $last_insert_id = $this->insert_id;
@@ -228,17 +220,28 @@ class database extends mysqli {
     $result = $this->query_($query);
     $results = array();
     while ($row = $result->fetch_assoc()) {
-      $results[$row[$table . '_id']] = $row;
-      if (!$this->readback_disabled) {
-        if (
-          ($updated) or
-          (isset($this->old_rows[$table][$row[$table . '_id']]))
-        ) {
-          $this->new_rows[$table][$row[$table . '_id']] = $row;
-        } else {
-          $this->old_rows[$table][$row[$table . '_id']] = $row;
+      $audit_row = $row;
+      foreach ($row as $column => &$value) {
+        if ($value) {
+          if (strpos($column, 'compressed') !== false) {
+            $value = gzuncompress(substr($value, 4));
+            unset($audit_row[$column]);
+          }
+          if (strpos($column, 'json') !== false) {
+            $value = json_decode($value, true);
+            unset($audit_row[$column]);
+          }
         }
       }
+      if (
+        ($updated) or
+        (isset($this->old_rows[$table][$audit_row[$table . '_id']]))
+      ) {
+        $this->new_rows[$table][$audit_row[$table . '_id']] = $audit_row;
+      } else {
+        $this->old_rows[$table][$audit_row[$table . '_id']] = $audit_row;
+      }
+      $results[$row[$table . '_id']] = $row;
     }
     return $results;
   }

@@ -15,14 +15,16 @@ class request_json extends request {
       set_error_handler(array($this, 'error_handler'));
       register_shutdown_function(array($this, 'shutdown_function'));
       try {
-        die(json_encode(array(
+        $result = json_encode(array(
           'success' => true,
           'result' => $this->handle(
             $request['class'], 
             $request['function'], 
             json_decode($request['arguments'], true)
           ),
-        )));
+        ));
+        api::commit();
+        die($result);
       } catch (Exception $e) {
         die(json_encode(array(
           'success' => false,

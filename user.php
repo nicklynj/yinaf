@@ -1,13 +1,7 @@
 <?php
 
 class user extends api {
-  public function __construct() {
-    parent::__construct();
-    $this->database->disable_caching();
-  }
-  public function __destruct() {
-    $this->database->enable_caching();
-  }
+  private static $session;
   private function verify_password($user, $password) {
     if ($user['password'] === hash('sha512', $user['uuid'] . $password)) {
       return $user;
@@ -36,7 +30,7 @@ class user extends api {
           (!(configuration::$user_track_failed_logins)) or
           ($user['failed_logins'] < configuration::$user_max_failed_logins)
         ) {
-          return $this->database->create('session', array(
+          return self::$session = $this->database->create('session', array(
             'user_id' => $user['user_id'],
             'key' => hash('sha512', $user['uuid'] . time() . mt_rand()),
           ));
@@ -56,9 +50,8 @@ class user extends api {
       ) + $session);
     }
   }
-  private static $memo_session;
   private function get_session() {
-    if (!isset(self::$memo_session)) {
+    if (!isset(self::$session)) {
       $request = request::get_last_request();
       if ($request->get_class_name() === 'request_json') {
         if (
@@ -68,19 +61,17 @@ class user extends api {
           ))) and
           ((time() - strtotime($session['created_at'])) < configuration::$session_max_life)
         ) {
-          self::$memo_session = $session;
+          return $session;
         }  
       } else {
-        self::$memo_session = array(
+        return array(
           'user_id' => $request->get_user_id(),
         );
       }
     }
-    return self::$memo_session;
   }
-  private static $memo_resume;
   public function resume() {
-    if (!isset(self::$memo_resume)) {
+    if (!isset(self::$session)) {
       if ($session = $this->get_session()) {
         if (configuration::$database_user_client) {
           $client_id = request::get_last_request()->get_requested('client_id');
@@ -92,14 +83,14 @@ class user extends api {
             $this->database->select_db(
               configuration::$database_client_prefix . '_' . $client_id
             );
-            self::$memo_resume = $session;
+            self::$session = $session;
           }
         } else {
-          self::$memo_resume = $session;
+          self::$session = $session;
         }
       }
     }
-    return self::$memo_resume;
+    return self::$session;
   }
   public function update_password($arguments) {
     if ($session = $this->resume()) {

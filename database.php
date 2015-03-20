@@ -2,13 +2,10 @@
 
 class database extends mysqli {
 
-  private $number_of_queries = 0;
-  private $query_time = 0;
   private $transaction_started = false;
   private $escaping_disabled = false;
   private $commits_disabled = false;
   private $readback_disabled = false;
-  private $caching_disabled = false;
   private $old_rows = array();
   private $new_rows = array();
   private function word($str) {
@@ -64,11 +61,10 @@ class database extends mysqli {
           unset($rows);
         }
         $this->disable_readback();
-        $this->disable_caching();
         new audit($this->old_rows, $this->new_rows);
         $this->enable_readback();
-        $this->enable_caching();
       }
+      
       $this->old_rows = array();
       $this->new_rows = array();
       $query = 'commit';
@@ -76,12 +72,8 @@ class database extends mysqli {
       $this->transaction_started = false;
     }
   }
-  private function query_($str) { // var_dump($str);
-    ++$this->number_of_queries;
-    $this->query_time -= microtime(true);
-    $result = parent::query($str);
-    $this->query_time += microtime(true);
-    if ($result) {
+  private function query_($str) {  var_dump($str);
+    if ($result = parent::query($str)) {
       return $result;
     } else {
       throw new Exception($this->error . ':' . $str);
@@ -119,8 +111,12 @@ class database extends mysqli {
     return '(' . implode(') and (', $clauses) . ')';
   }
   
-  function __destruct() {
+  public function __destruct() {
     $this->commit_transaction();
+  }
+  public function __construct() {
+    call_user_func_array(array($this, 'parent::__construct'), func_get_args());
+    $this->start_transaction();
   }
   
   public function disable_escaping() {
@@ -137,19 +133,6 @@ class database extends mysqli {
   }
   public function enable_readback() {
     $this->readback_enabled = true;
-  }
-  public function disable_caching() {
-    $this->caching_disabled = true;
-  }
-  public function enable_caching() {
-    $this->caching_disabled = false;
-  }
-  
-  public function get_number_of_queries() {
-    return $this->number_of_queries;
-  }
-  public function get_query_time() {
-    return $this->query_time;
   }
   
   public function uuid() {
@@ -175,20 +158,31 @@ class database extends mysqli {
   
   public function create($table, $attributes) {
     $this->start_transaction();
-    if ($all_numeric_keys = $this->all_numeric_keys($attributes)) {
-      $inserts = $attributes;
-    } else {
-      $inserts = array($attributes);
+    if (!$attributes) {
+      return array();
+    }
+    if (!($all_numeric_keys = $this->all_numeric_keys($attributes))) {
+      $attributes = array($attributes);
+    }
+    $attributes_indexed = array();
+    foreach ($attributes as &$attribute) {
+      $attributes_indexed[json_encode(array_keys($attribute))][] = &$attribute;
     }
     $ids = array();
-    foreach ($inserts as &$insert) {
+    foreach ($attributes_indexed as $index => &$attribute_indexed) {
       $query = 
         'insert into ' . $this->word($table) . ' ' . 
-        ' (' . implode(',', array_map(array($this, 'word'), array_keys($insert))) . ') ' .
-        'values ' .
-        '(' . implode(',', array_map(array($this, 'escape_if'), $insert)) . ')';
-      $this->query_($query);
-      $ids[] = $this->insert_id;
+        ' (' . implode(',', array_map(array($this, 'word'), array_keys($attribute_indexed[0]))) . ') ' .
+          'values ';
+      $inserts = array();
+      for ($i = 0; isset($attribute_indexed[$i]); ++$i) {
+        $inserts[] = '(' . implode(',', array_map(array($this, 'escape_if'), $attribute_indexed[$i])) . ')';
+      }
+      $this->query_($query . implode(',', $inserts));
+      $last_insert_id = $this->insert_id;
+      for ($j = 0; $j < $i; ++$j) {
+        $ids[] = $last_insert_id - configuration::$database_auto_increment_increment * $j;
+      }
     }
     if ($this->readback_disabled) {
       if ($all_numeric_keys) {
@@ -235,10 +229,7 @@ class database extends mysqli {
     $results = array();
     while ($row = $result->fetch_assoc()) {
       $results[$row[$table . '_id']] = $row;
-      if (
-        (!($this->readback_disabled)) and
-        (!($this->caching_disabled))
-      ) {
+      if (!$this->readback_disabled) {
         if (
           ($updated) or
           (isset($this->old_rows[$table][$row[$table . '_id']]))
@@ -262,9 +253,7 @@ class database extends mysqli {
     foreach ($updates as &$update) {
       $ids[] = $update[$table . '_id'];
     }
-    if (!($this->caching_disabled)) {
-      $this->read($table, $ids);
-    }
+    $this->read($table, $ids);
     foreach ($updates as &$update) {
       $id = $update[$table . '_id'];
       unset($update[$table . '_id']);

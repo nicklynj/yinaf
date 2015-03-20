@@ -7,6 +7,8 @@ abstract class configuration {
   public static $database_host = 'example.com';
   public static $database_name = 'example';
   
+  public static $database_auto_increment_increment = 1;
+  
   public static $database_root_column = 'user';
   public static $database_user_client = false;
   public static $database_client_prefix = null;

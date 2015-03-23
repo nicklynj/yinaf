@@ -70,7 +70,6 @@ layer.prototype.get_class_name_recursive_slow_ = function(parent, opt_prefix) {
       if (parent[i] === this.constructor) {
         return name;
       } else {
-        console.log(i);
         if (name = this.get_class_name_recursive_slow_(parent[i], name)) {
           return name;
         }
@@ -129,6 +128,6 @@ layer.prototype.render_previous = function(opt_cancel) {
 
 
 layer.prototype.render_clear = function() {
-  this.render();
   layer.layers = [this];
+  this.render();
 };

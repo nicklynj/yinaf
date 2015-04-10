@@ -11,7 +11,7 @@ class user extends api {
     if (
       $user = $this->database->get('user', array(
         'username' => $arguments['username'],
-      ) + array_intersect_key($arguments, array_flip(configuration::$login_additional_columns)))
+      ) + array_intersect_key($arguments, array_flip(configuration::$user_additional_columns)))
     ) {
       return $user;
     }
@@ -58,7 +58,7 @@ class user extends api {
         if (
           ($session = $this->database->get('session', array(
             'key' => $request->get_requested('key'),
-            // 'destroyed' => 0,
+            'destroyed' => 0,
           ))) and
           ((time() - strtotime($session['created_at'])) < configuration::$session_max_life)
         ) {
@@ -74,7 +74,11 @@ class user extends api {
   public function resume() {
     if (!isset(self::$session)) {
       if ($session = $this->get_session()) {
-        if (configuration::$database_user_client) {
+        if (configuration::$database_root_user) {
+          if ($session['user_id'] == request::get_last_request()->get_requested('user_id')) {
+            self::$session = $session;
+          }
+        } else if (configuration::$database_user_client) {
           $client_id = request::get_last_request()->get_requested('client_id');
           if ($this->database->get('user_client', array(
             'user_id' => $session['user_id'],
@@ -107,13 +111,10 @@ class user extends api {
   public function create($arguments) {
     $uuid = $this->database->uuid();
     if ($this->database->insert('user', array(
-      'uuid' => $this->database->escape($uuid),
-      'username' => $this->database->escape($arguments['username']),
-      'password' => 'sha1(concat(' .
-        $this->database->escape($uuid) . ', ' . 
-        $this->database->escape($arguments['password']) . 
-      '))',
-    ))) {
+      'uuid' => $uuid,
+      'username' => $arguments['username'],
+      'password' => hash('sha512', $uuid . $arguments['password']), 
+    ) + array_intersect_key($arguments, array_flip(configuration::$user_additional_columns)))) {
       return $this->login($arguments);
     }
   }

@@ -11,11 +11,12 @@ abstract class configuration {
   
   public static $database_auto_increment_increment = 1;
   
+  public static $database_root_user = true;
   public static $database_root_column = 'user';
   public static $database_user_client = false;
   public static $database_client_prefix = null;
   
-  public static $login_additional_columns = array('client_id');
+  public static $user_additional_columns = array('client_id');
   
   public static $session_max_life = 7776000;
     

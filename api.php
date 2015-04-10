@@ -25,7 +25,7 @@ class api {
   }
   public static function commit() {
     if (isset(self::$database_instance)) {
-      self::$database_instance->commit_transaction();
+      self::$database_instance->commit();
     }
   }
   protected function api($class, $function/* , $var_args */) {
@@ -56,10 +56,11 @@ class api {
     $results = array();
     foreach ($arguments as $argument) {
       $results[isset($argument['alias']) ? $argument['alias'] : $argument['class']] =
-        $this->api(
-          $argument['class'], 
-          $argument['function'], 
-          $this->replacer(isset($argument['arguments']) ? $argument['arguments'] : null, $results)
+        call_user_func_array(array($this, 'api'),
+          array_merge(
+            array($argument['class'], $argument['function']), 
+            array_key_exists('arguments', $argument) ? array($this->replacer($argument['arguments'], $results)) : array()
+          )
         );
     }
     return $results;

@@ -20,66 +20,47 @@ class database extends mysqli {
   }
   private function start_transaction() {
     if (!$this->transaction_started) {
-      $query = 'start transaction';
-      $this->query_($query);
+      $this->query('start transaction');
       $this->transaction_started = true;
-      $this->queries = array();
-    }
-  }
-  private function query_($str) {
-    if (configuration::$debug) {
-      $start = microtime(true);
-      $result = parent::query($str);
-      $this->queries[] = array(
-        'time' => round(microtime(true) - $start, 4),
-        'string' => preg_replace('/[^\x09\x0A\x0D(\x20-\x7F)]+/', '?', $str),
-        'num_rows' => isset($result->num_rows) ? $result->num_rows : null,
-        'info' => $this->info,
-        'affected_rows' => $this->affected_rows,
-        'api_call_i' => count(api::get_calls()) - 1,
-      );
-      if ($result) {
-        return $result;
-      } else {
-        throw new Exception($this->error . ':' . $str);
-      }
-    } else {
-      if ($result = parent::query($str)) {
-        return $result;
-      } else {
-        throw new Exception($this->error . ':' . $str);
-      }
     }
   }
   private function all_numeric_keys($attributes) {
     return ($attributes) and 
       (!(in_array(false, array_map('is_int', array_keys($attributes)), true)));
   }
-  private function get_clause_from_attributes($table, $ids_or_attributes) {
-    if ($this->all_numeric_keys($ids_or_attributes)) {
-      $attributes = array(
-        $table . '_id' => $ids_or_attributes,
-      );
-    } else {
-      $attributes = $ids_or_attributes;
-    }
+  private function get_clause_from_attributes_array($table, $attributes_array) {
     $clauses = array();
-    foreach ($attributes as $key => $value) {
-      $clause = $this->word($key);
-      if (is_array($value)) {
-        if ($value) {
-          $clause .= ' in (' . implode(',',
-              array_map(array($this, 'escape'), $value)
-            ) . ')';
-        } else {
-          return array();
-        }
-      } else if ($value === null) {
-        $clause .= ' is null';
+    foreach ($attributes_array as &$id_or_ids_or_attributes) {
+      if (
+        (is_numeric($id_or_ids_or_attributes)) or
+        ($this->all_numeric_keys($id_or_ids_or_attributes))
+      ) {
+        $attributes = array(
+          $table . '_id' => $id_or_ids_or_attributes,
+        );
       } else {
-        $clause .= '=' . $this->escape($value);
+        $attributes = $id_or_ids_or_attributes;
       }
-      $clauses[] = $clause;
+      foreach ($attributes as $key => &$value) {
+        $clause = $this->word($key);
+        if (is_array($value)) {
+          if ($value) {
+            $clause .= ' in (' . implode(',',
+                array_map(array($this, 'escape'), $value)
+              ) . ')';
+            if (in_array(null, $value, true)) {
+              $clause = '('.$clause.' or '.$this->word($key).' is null)';
+            }
+          } else {
+            return null;
+          }
+        } else if ($value === null) {
+          $clause .= ' is null';
+        } else {
+          $clause .= '=' . $this->escape($value);
+        }
+        $clauses[] = $clause;
+      }
     }
     return $clauses ? 
       '(' . implode(') and (', $clauses) . ')' : 
@@ -98,9 +79,45 @@ class database extends mysqli {
       return '"' . $this->real_escape_string($str) . '"';
     }
   }
+  private function escape_attributes($attributes) {
+    return '(' . implode(',', array_map(array($this, 'escape'), array_values($attributes), array_keys($attributes))) . ')';
+  }
+  private function read_($table, $attributes_array, $created) {
+    if (!($where_clause = $this->get_clause_from_attributes_array($table, $attributes_array))) {
+      return array();
+    }
+    $this->start_transaction();
+    $result = $this->query('select * from ' . $this->word($table) . ' where ' . $where_clause);
+    $results = array();
+    while ($row = $result->fetch_assoc()) {
+      $audit_row = $row;
+      foreach ($row as $column => &$value) {
+        if ($value) {
+          if (strpos($column, 'compressed') !== false) {
+            $value = gzuncompress(substr($value, 4));
+            unset($audit_row[$column]);
+          }
+          if (strpos($column, 'json') !== false) {
+            $value = json_decode($value, true);
+            unset($audit_row[$column]);
+          }
+        }
+      }
+      if (
+        ($created) or
+        (isset($this->old_rows[$table][$audit_row[$table . '_id']]))
+      ) {
+        $this->new_rows[$table][$audit_row[$table . '_id']] = $audit_row;
+      } else {
+        $this->old_rows[$table][$audit_row[$table . '_id']] = $audit_row;
+      }
+      $results[$row[$table . '_id']] = $row;
+    }
+    return $results;
+  }
   
   public function __destruct() {
-    $this->commit_transaction();
+    $this->commit();
   }
   public function __construct() {
     call_user_func_array(array($this, 'parent::__construct'), func_get_args());
@@ -118,19 +135,40 @@ class database extends mysqli {
     $this->readback_disabled = true;
   }
   public function enable_readback() {
-    $this->readback_enabled = true;
+    $this->readback_disabled = false;
   }
   
   public function uuid() {
-    $result = $this->query_('select uuid()');
+    $result = $this->query('select uuid()');
     return $result['uuid()'];
   }
   
   public function query($str) {
-    throw new Exception('query disabled');
+    if (configuration::$debug) {
+      $start = microtime(true);
+      $result = parent::query($str);
+      $this->queries[] = array(
+        'time' => round(microtime(true) - $start, 4),
+        'string' => preg_replace('/[^\x09\x0A\x0D(\x20-\x7F)]+/', '?', $str),
+        'num_rows' => isset($result->num_rows) ? $result->num_rows : null,
+        'info' => $this->info,
+        'affected_rows' => $this->affected_rows,
+      );
+      if ($result) {
+        return $result;
+      } else {
+        throw new Exception($this->error . ':' . $str);
+      }
+    } else {
+      if ($result = parent::query($str)) {
+        return $result;
+      } else {
+        throw new Exception($this->error . ':' . $str);
+      }
+    }
   }
 
-  public function commit_transaction() {
+  public function commit() {
     if (
       ($this->transaction_started) and
       (!$this->commits_disabled)
@@ -164,175 +202,122 @@ class database extends mysqli {
       }
       $this->old_rows = array();
       $this->new_rows = array();
-      $query = 'commit';
-      $this->query_($query);
+      $this->query('commit');
       $this->transaction_started = false;
-      $this->queries = array();
+      return true;
+    } else {
+      return false;
     }
   }
-  
-  public function create($table, $attributes) {
+ 
+  public function read($table/* , $var_args */) {
+    return $this->read_($table, array_slice(func_get_args(), 1), false);
+  }
+  public function get($table/* , $var_args */) {
+    foreach ($this->read_($table, array_slice(func_get_args(), 1), false) as $result) {
+      return $result;
+    }
+  }
+  public function create($table, $attributes_or_array) {
+    if ($all_numeric_keys = $this->all_numeric_keys($attributes_or_array)) {
+      $attributes_array = $attributes_or_array;
+    } else {
+      $attributes_array = array($attributes_or_array);
+    }
     $this->start_transaction();
-    if (!$attributes) {
-      return array();
-    }
-    if (!($all_numeric_keys = $this->all_numeric_keys($attributes))) {
-      $attributes = array($attributes);
-    }
-    $attributes_indexed = array();
-    foreach ($attributes as &$attribute) {
-      $attributes_indexed[json_encode(array_keys($attribute))][] = &$attribute;
+    $attributes_array_indexed = array();
+    foreach ($attributes_array as &$attributes) {
+      $attributes_array_indexed[json_encode(array_keys($attributes))][] = &$attributes;
     }
     $ids = array();
-    foreach ($attributes_indexed as $index => &$attribute_indexed) {
-      $columns = json_decode($index, true);
-      $query = 
-        'insert into ' . $this->word($table) . ' ' . 
-        ' (' . implode(',', array_map(array($this, 'word'), array_keys($attribute_indexed[0]))) . ') ' .
-          'values ';
-      $inserts = array();
-      for ($i = 0; isset($attribute_indexed[$i]); ++$i) {
-        $inserts[] = '(' . implode(',', array_map(array($this, 'escape'), $attribute_indexed[$i], $columns)) . ')';
-      }
-      $this->query_($query . implode(',', $inserts));
+    foreach ($attributes_array_indexed as $index => &$attributes_array_index) {
+      $this->query('insert into ' . $this->word($table) . ' ' . 
+        ' (' . implode(',', array_map(array($this, 'word'), array_keys($attributes_array_index[0]))) . ') ' .
+          'values ' . implode(',', array_map(array($this, 'escape_attributes'), $attributes_array_index)));
       $last_insert_id = $this->insert_id;
-      for ($j = 0; $j < $i; ++$j) {
-        $ids[] = $last_insert_id - configuration::$database_auto_increment_increment * $j;
+      for ($i = 0, $len = count($attributes_array_index); $i < $len; ++$i) {
+        $ids[] = $last_insert_id - configuration::$database_auto_increment_increment * $i;
       }
     }
     if ($this->readback_disabled) {
       if ($all_numeric_keys) {
         return $ids;
       } else {
-        foreach ($ids as $id) {
-          return $id;
-        }
+        return $ids[0];
       }
     } else {
+      $rows = $this->read_($table, array($ids), true);
       if ($all_numeric_keys) {
-        return array_values($this->read($table, $ids, true));
+        return array_values($rows);
       } else {
-        return $this->get($table, $ids, true);
+        foreach ($rows as &$row) {
+          return $row;
+        }
       }
     }
   }
-  public function read($table, $ids_or_attributes, $updated = false) {
-    $this->start_transaction();
-    if ($this->all_numeric_keys($ids_or_attributes)) {
-      $ids = $ids_or_attributes;
-      if (
-        (!$updated) and
-        (!array_diff($ids, 
-          (isset($this->new_rows[$table]) ? array_keys($this->new_rows[$table]) : array()),
-          (isset($this->old_rows[$table]) ? array_keys($this->old_rows[$table]) : array())
-        ))
-      ) {
-        $results = array();
-        foreach ($ids as $id) {
-          if (isset($this->new_rows[$table][$id])) {
-            $results[$id] = $this->new_rows[$table][$id];
-          } else {
-            $results[$id] = $this->old_rows[$table][$id];
-          }
-        }
-        return $results;
-      }
-    }
-    $query =
-      'select * from ' . $this->word($table) . ' ' .
-      'where ' . $this->get_clause_from_attributes($table, $ids_or_attributes);
-    $result = $this->query_($query);
-    $results = array();
-    while ($row = $result->fetch_assoc()) {
-      $audit_row = $row;
-      foreach ($row as $column => &$value) {
-        if ($value) {
-          if (strpos($column, 'compressed') !== false) {
-            $value = gzuncompress(substr($value, 4));
-            unset($audit_row[$column]);
-          }
-          if (strpos($column, 'json') !== false) {
-            $value = json_decode($value, true);
-            unset($audit_row[$column]);
-          }
-        }
-      }
-      if (
-        ($updated) or
-        (isset($this->old_rows[$table][$audit_row[$table . '_id']]))
-      ) {
-        $this->new_rows[$table][$audit_row[$table . '_id']] = $audit_row;
-      } else {
-        $this->old_rows[$table][$audit_row[$table . '_id']] = $audit_row;
-      }
-      $results[$row[$table . '_id']] = $row;
-    }
-    return $results;
-  }
-  public function update($table, $attributes, $where_clause = array()) {
-    $this->start_transaction();
-    if (!$attributes) {
+  public function update($table, $attributes_or_array, $where_clause = array()) {
+    if (!$attributes_or_array) {
       return array();
     }
-    if ($all_numeric_keys = $this->all_numeric_keys($attributes)) {
-      $updates = $attributes;
+    $this->start_transaction();
+    if ($all_numeric_keys = $this->all_numeric_keys($attributes_or_array)) {
+      $attributes_array = $attributes_or_array;
     } else {
-      $updates = array($attributes);
+      $attributes_array = array($attributes_or_array);
     }
     $ids = array();
-    foreach ($updates as &$update) {
-      $ids[] = $update[$table . '_id'];
+    foreach ($attributes_array as &$attributes) {
+      $ids[] = $attributes[$table . '_id'];
     }
-    $this->read($table, $ids);
-    foreach ($updates as &$update) {
-      $id = $update[$table . '_id'];
-      unset($update[$table . '_id']);
-      if ($update) {
+    if (!$this->readback_disabled) {
+      $this->read_($table, array($ids), false);
+    } 
+    foreach ($attributes_array as &$attributes) {
+      $id = $attributes[$table . '_id'];
+      unset($attributes[$table . '_id']);
+      if ($attributes) {
         $clauses = array();
-        $query = 'update ' . $this->word($table) . ' set ' . implode(',',
+        $this->query('update ' . $this->word($table) . ' set ' . implode(',',
           array_map(
             array(
               $this,
               'column_equals_value'
             ),
-            array_keys($update),
-            array_values($update)
+            array_keys($attributes),
+            array_values($attributes)
           )
-        ) . ' where ' . $this->get_clause_from_attributes($table, array(
-          $table . '_id' => $id,
-        ) + $where_clause);
-        $this->query_($query);
+        ) . ' where ' . $this->get_clause_from_attributes_array($table, array_merge(
+          array($table . '_id' => $id),
+          array_slice(func_get_args(), 2)
+        )));
+        if (
+          (!preg_match('/matched\: (\d+)/', $this->info, $match)) or
+          (!$match[1])
+        ) {
+          throw new Exception('match not found on table:"' . $table . '", id:"' . $id . '"');
+        }
       }
     }
     if ($this->readback_disabled) {
       if ($all_numeric_keys) {
         return $ids;
       } else {
-        foreach ($ids as $id) {
-          return $id;
-        }
+        return $ids[0];
       }
     } else {
+      $indexed_rows = $this->read_($table, array($ids), false);
       if ($all_numeric_keys) {
-        $indexed_results = $this->read($table, $ids, true);
-        $ordered_results = array();
-        foreach ($ids as $id) {
-          $ordered_results[] = $indexed_results[$id];
+        $ordered_rows = array();
+        foreach ($ids as &$id) {
+          $ordered_rows[] = $indexed_rows[$id];
         }
-        return $ordered_results;
+        return $ordered_rows;
       } else {
-        return $this->get($table, $ids, true);
+        foreach ($indexed_rows as &$row) {
+          return $row;
+        }
       }
-    }
-  }
-  public function get($table, $id_or_attributes, $updated = false) {
-    if (is_numeric($id_or_attributes)) {
-      $attributes = array($id_or_attributes);
-    } else {
-      $attributes = $id_or_attributes;
-    }
-    foreach ($this->read($table, $attributes, $updated) as $result) {
-      return $result;
     }
   }
 

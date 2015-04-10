@@ -8,7 +8,7 @@ var cache = function() {
 rocket.inherits(cache, state);
 
 
-cache.last_insert_id = 0;
+cache.last_insert_id_ = 0;
 
 
 cache.cache = {};
@@ -21,7 +21,7 @@ cache.prototype.load = function(data) {
 
 cache.prototype.create = function(table, attributes) {
   return this.update(table, rocket.extend(
-    rocket.object(table + '_id', --cache.last_insert_id), 
+    rocket.object(table + '_id', --cache.last_insert_id_), 
     attributes
   ));
 };

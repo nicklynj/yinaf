@@ -37,18 +37,20 @@ api.prototype.request = function(cls, fnct, opt_args, opt_success, opt_xhr) {
         throw response.result;
       }
     } catch (e) {
-      if (error) {
-        error(e);
+      if (exception) {
+        new exception(e);
       }
     }
   });
   
   xhr.addEventListener('error', function() {
-    if (error) {
-      error({'message': 'XMLHttpRequest failure'});
+    if (exception) {
+      new exception({'message': 'XMLHttpRequest failure'});
     }
   });
 
   xhr.send();
 
+  return xhr;
+  
 };

@@ -7,4 +7,4 @@ cat cache.js >> build/yinaf.js
 cat layer.js >> build/yinaf.js
 cat component.js >> build/yinaf.js
 cat api.js >> build/yinaf.js
-cat error.js >> build/yinaf.js
+cat exception.js >> build/yinaf.js

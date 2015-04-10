@@ -4,7 +4,7 @@
 var api = function() {
   if (!(this instanceof api)) {
     var obj = new api();
-    return obj.request.apply(obj, arguments)
+    return obj.request.apply(obj, arguments);
   }
 };
 

@@ -20,7 +20,7 @@ class database extends mysqli {
   }
   private function start_transaction() {
     if (!$this->transaction_started) {
-      $this->query('start transaction');
+      parent::query('start transaction');
       $this->transaction_started = true;
     }
   }

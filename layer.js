@@ -33,8 +33,18 @@ layer.prototype.get_layers = function() {
 
 
 layer.prototype.get_class_names_ = function() {
-  return this.constructor.prototype.class_names = this.class_names = this.class_names || 
-    ['layer'].concat(this.get_class_name_recursive_(layer) || this.get_class_name_recursive_slow_(layer));
+  var base_class;
+  var class_names;
+  if (class_names = this.get_class_name_recursive_(layer)) {
+    base_class = 'layer';
+  } else if (class_names = this.get_class_name_recursive_(component)) {
+    base_class = 'component';
+  } else if (class_names = this.get_class_name_recursive_slow_(layer)) {
+    base_class = 'layer';
+  } else if (class_names = this.get_class_name_recursive_slow_(component)) {
+    base_class = 'component';
+  }
+  return this.constructor.prototype.class_names = this.class_names = this.class_names || [base_class].concat(class_names);
 };
 
 

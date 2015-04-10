@@ -38,14 +38,14 @@ api.prototype.request = function(cls, fnct, opt_args, opt_success, opt_xhr) {
       }
     } catch (e) {
       if (exception) {
-        new exception(e);
+        exception(e);
       }
     }
   });
   
   xhr.addEventListener('error', function() {
     if (exception) {
-      new exception({'message': 'XMLHttpRequest failure'});
+      exception({'message': 'XMLHttpRequest failure'});
     }
   });
 

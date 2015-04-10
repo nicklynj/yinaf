@@ -59,7 +59,7 @@ class api {
         $this->api(
           $argument['class'], 
           $argument['function'], 
-          $this->replacer($argument['arguments'], $results)
+          $this->replacer(isset($argument['arguments']) ? $argument['arguments'] : null, $results)
         );
     }
     return $results;

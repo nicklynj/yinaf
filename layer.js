@@ -33,18 +33,10 @@ layer.prototype.get_layers = function() {
 
 
 layer.prototype.get_class_names_ = function() {
-  var base_class;
-  var class_names;
-  if (class_names = this.get_class_name_recursive_(layer)) {
-    base_class = 'layer';
-  } else if (class_names = this.get_class_name_recursive_(component)) {
-    base_class = 'component';
-  } else if (class_names = this.get_class_name_recursive_slow_(layer)) {
-    base_class = 'layer';
-  } else if (class_names = this.get_class_name_recursive_slow_(component)) {
-    base_class = 'component';
-  }
-  return this.constructor.prototype.class_names = this.class_names = this.class_names || [base_class].concat(class_names);
+  return this.constructor.prototype.class_names = this.class_names = this.class_names || this.get_class_name_recursive_({
+    'layer': layer,
+    'component': component
+  });
 };
 
 
@@ -61,26 +53,6 @@ layer.prototype.get_class_name_recursive_ = function(parent, opt_prefix) {
         return name;
       } else {
         if (name = this.get_class_name_recursive_(parent[i], name)) {
-          return name;
-        }
-      }
-    }
-  }
-};
-
-
-layer.prototype.get_class_name_recursive_slow_ = function(parent, opt_prefix) {
-  for (var i in parent) {
-    if (
-      (parent[i]) &&
-      (parent[i].prototype)
-    ) {
-      var name = opt_prefix ? rocket.clone(opt_prefix) : [];
-      name.push(i);
-      if (parent[i] === this.constructor) {
-        return name;
-      } else {
-        if (name = this.get_class_name_recursive_slow_(parent[i], name)) {
           return name;
         }
       }
@@ -138,6 +110,6 @@ layer.prototype.render_previous = function(opt_cancel) {
 
 
 layer.prototype.render_clear = function() {
-  layer.layers = [this];
   this.render();
+  layer.layers = [this];
 };

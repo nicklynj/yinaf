@@ -86,7 +86,6 @@ class database extends mysqli {
     if (!($where_clause = $this->get_clause_from_attributes_array($table, $attributes_array))) {
       return array();
     }
-    $this->start_transaction();
     $result = $this->query('select * from ' . $this->word($table) . ' where ' . $where_clause);
     $results = array();
     while ($row = $result->fetch_assoc()) {
@@ -119,10 +118,6 @@ class database extends mysqli {
   public function __destruct() {
     $this->commit();
   }
-  public function __construct() {
-    call_user_func_array(array($this, 'parent::__construct'), func_get_args());
-    $this->start_transaction();
-  }
   
   public function get_queries() {
     return $this->queries;
@@ -144,6 +139,7 @@ class database extends mysqli {
   }
   
   public function query($str) {
+    $this->start_transaction();
     if (configuration::$debug) {
       $start = microtime(true);
       $result = parent::query($str);
@@ -224,7 +220,6 @@ class database extends mysqli {
     } else {
       $attributes_array = array($attributes_or_array);
     }
-    $this->start_transaction();
     $attributes_array_indexed = array();
     foreach ($attributes_array as &$attributes) {
       $attributes_array_indexed[json_encode(array_keys($attributes))][] = &$attributes;
@@ -256,11 +251,10 @@ class database extends mysqli {
       }
     }
   }
-  public function update($table, $attributes_or_array, $where_clause = array()) {
+  public function update($table, $attributes_or_array/* , $var_args */) {
     if (!$attributes_or_array) {
       return array();
     }
-    $this->start_transaction();
     if ($all_numeric_keys = $this->all_numeric_keys($attributes_or_array)) {
       $attributes_array = $attributes_or_array;
     } else {

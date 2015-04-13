@@ -38,6 +38,8 @@ class database extends mysqli {
         $attributes = array(
           $table . '_id' => $id_or_ids_or_attributes,
         );
+      } else if ($id_or_ids_or_attributes === null) {
+        $attributes = array();
       } else {
         $attributes = $id_or_ids_or_attributes;
       }

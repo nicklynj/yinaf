@@ -15,7 +15,7 @@ var cache = function() {
 rocket.inherits(cache, state);
 
 
-cache.last_insert_id = 0;
+cache.last_insert_id_ = 0;
 
 
 cache.cache = {};
@@ -28,7 +28,7 @@ cache.prototype.load = function(data) {
 
 cache.prototype.create = function(table, attributes) {
   return this.update(table, rocket.extend(
-    rocket.object(table + '_id', --cache.last_insert_id), 
+    rocket.object(table + '_id', --cache.last_insert_id_), 
     attributes
   ));
 };
@@ -390,9 +390,7 @@ cache.prototype.flush_handle_result = function(result, alias_to_table, negative_
 
 var layer = function() {
   cache.apply(this, arguments);
-  this.get_class_names_();
-  // if (this instanceof layer) {
-  if (this.class_names[0] === 'layer') {
+  if (this.get_class_names_()[0] === 'layer') {
     layer.layers.push(this);
     if (this.get_previous_layer()) {
       this.state = rocket.clone(this.get_previous_layer().state);
@@ -420,8 +418,10 @@ layer.prototype.get_layers = function() {
 
 
 layer.prototype.get_class_names_ = function() {
-  return this.constructor.prototype.class_names = this.class_names = this.class_names || 
-    ['layer'].concat(this.get_class_name_recursive_(layer) || this.get_class_name_recursive_slow_(layer));
+  return this.constructor.prototype.class_names_ = this.class_names_ = this.class_names_ || this.get_class_name_recursive_({
+    'layer': layer,
+    'component': component
+  });
 };
 
 
@@ -446,27 +446,6 @@ layer.prototype.get_class_name_recursive_ = function(parent, opt_prefix) {
 };
 
 
-layer.prototype.get_class_name_recursive_slow_ = function(parent, opt_prefix) {
-  for (var i in parent) {
-    if (
-      (parent[i]) &&
-      (parent[i].prototype)
-    ) {
-      var name = opt_prefix ? rocket.clone(opt_prefix) : [];
-      name.push(i);
-      if (parent[i] === this.constructor) {
-        return name;
-      } else {
-        console.log(i);
-        if (name = this.get_class_name_recursive_slow_(parent[i], name)) {
-          return name;
-        }
-      }
-    }
-  }
-};
-
-
 layer.prototype.layer_previous_container_;
 
 
@@ -476,8 +455,9 @@ layer.prototype.render = function(opt_parent) {
   this.decorate(container);
   if (container.innerHTML()) {
     var containers = [];
-    for (var i = 0; this.class_names[i]; ++i) {
-      containers.push(rocket.createElement('div').addClass(this.class_names[i]));
+    var class_names = this.get_class_names_();
+    for (var i = 0; class_names[i]; ++i) {
+      containers.push(rocket.createElement('div').addClass(class_names[i]));
       if (i) {
         containers[i - 1].appendChild(containers[i]);
       }
@@ -516,8 +496,8 @@ layer.prototype.render_previous = function(opt_cancel) {
 
 
 layer.prototype.render_clear = function() {
-  this.render();
   layer.layers = [this];
+  this.render();
 };
 
 
@@ -535,7 +515,7 @@ component.prototype.decorate = function() {};
 var api = function() {
   if (!(this instanceof api)) {
     var obj = new api();
-    return obj.request.apply(obj, arguments)
+    return obj.request.apply(obj, arguments);
   }
 };
 
@@ -568,24 +548,35 @@ api.prototype.request = function(cls, fnct, opt_args, opt_success, opt_xhr) {
         throw response.result;
       }
     } catch (e) {
-      if (error) {
-        error(e);
+      if (exception) {
+        exception(e);
       }
     }
   });
   
   xhr.addEventListener('error', function() {
-    if (error) {
-      error({'message': 'XMLHttpRequest failure'});
+    if (exception) {
+      exception({'message': 'XMLHttpRequest failure'});
     }
   });
 
   xhr.send();
 
+  return xhr;
+  
 };
 
 
 
-var error = function(err) {
-  alert('error:"' + err.message + '"');
+var exception = function() {
+  if (!(this instanceof exception)) {
+    var obj = new exception();
+    obj.handle.apply(obj, arguments);
+  }
+};
+
+
+exception.prototype.handle = function(exception) {
+  
+  alert('file:"' + exception.file + '", line:"' + exception.line + '", message:"' + exception.message + '"');
 };

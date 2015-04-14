@@ -10,6 +10,5 @@ var exception = function() {
 
 
 exception.prototype.handle = function(exception) {
-  
-  alert('file:"' + exception.file + '", line:"' + exception.line + '", message:"' + exception.message + '"');
+  alert('file:"' + (exception.file || exception.fileName) + '", line:"' + (exception.line || exception.lineNumber) + '", message:"' + exception.message + '"');
 };

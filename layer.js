@@ -63,8 +63,10 @@ layer.prototype.layer_previous_container_;
 
 
 layer.prototype.render = function(opt_parent) {
+  if (this.get_class_names_()[0] === 'layer') {
+    rocket.EventTarget.removeAllEventListeners();
+  }
   var container = rocket.createElement('div');
-  rocket.EventTarget.removeAllEventListeners();
   this.decorate(container);
   if (container.innerHTML()) {
     var containers = [];

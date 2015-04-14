@@ -8,6 +8,8 @@ var layer = function() {
     if (this.get_previous_layer()) {
       this.state = rocket.clone(this.get_previous_layer().state);
     }
+  } else {
+    this.state = this.get_top_layer().state;
   }
 };
 rocket.inherits(layer, cache);
@@ -22,6 +24,11 @@ layer.prototype.get_previous_layer = function() {
       return layer.layers[i - 1];
     }
   }
+};
+
+
+layer.prototype.get_top_layer = function() {
+  return layer.layers[layer.layers.length - 1];
 };
 
 

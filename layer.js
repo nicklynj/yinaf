@@ -95,6 +95,7 @@ layer.prototype.render = function(opt_parent) {
     }
     this.layer_previous_container_ = containers[0];
     this.dispatchEvent('render');
+    this.envoy.dispatchEvent('render');
   }
 };
 

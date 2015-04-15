@@ -16,22 +16,26 @@ class user extends api {
       return $user;
     }
   }
+  private function inet_aton($ip_address) {
+    $parts = explode('.', $ip_address, 4);
+    return isset($parts[3]) ?
+      (16777216 * $parts[0] +
+      65536 * $parts[1] +
+      256 * $parts[2] +
+      1 * $parts[3]) :
+      0;
+  }
   public function login($arguments) {
     if ($user = $this->get_user($arguments)) {
       if ($this->verify_password($user, $arguments['password'])) {
         if (
-          (configuration::$user_track_failed_logins) and
-          ($user['failed_logins'])
-        ) {
-          $user['failed_logins'] = 0;
-          $this->database->update('user', $user);
-        }
-        if (
           (!(configuration::$user_track_failed_logins)) or
-          ($user['failed_logins'] < configuration::$user_max_failed_logins)
+          ($user['failed_logins'] < configuration::$user_max_failed_logins) and
+          ($this->database->update('user', array('failed_logins' => 0) + $user))
         ) {
           return self::$session = $this->database->create('session', array(
             'user_id' => $user['user_id'],
+            'created_by' => $this->inet_aton($_SERVER['REMOTE_ADDR']),
             'key' => hash('sha512', $user['uuid'] . time() . mt_rand()),
           ));
         }
@@ -54,19 +58,22 @@ class user extends api {
     if (!isset(self::$session)) {
       $request = request::get_last_request();
       if ($request->get_class_name() === 'request_json') {
-        date_default_timezone_set('America/New_York');
         if (
           ($session = $this->database->get('session', array(
             'key' => $request->get_requested('key'),
             'destroyed' => 0,
           ))) and
-          ((time() - strtotime($session['created_at'])) < configuration::$session_max_life)
+          ($this->database->timestampdiff($session['created_at']) < configuration::$session_max_age) and
+          ($this->database->timestampdiff(max($session['used_at'], $session['created_at'])) < configuration::$session_expires)
         ) {
-          return $session;
+          return $this->database->update('session', array(
+            'used_at' => $this->database->now(),
+            'used_by' => $this->inet_aton($_SERVER['REMOTE_ADDR']),
+          ) + $session);
         }  
       } else {
         return array(
-          'user_id' => $request->get_user_id(),
+          'user_id' => $request->get_requested('user_id'),
         );
       }
     }

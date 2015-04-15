@@ -118,7 +118,28 @@ layer.prototype.render_previous = function(opt_cancel) {
 };
 
 
-layer.prototype.render_clear = function() {
+layer.prototype.render_current = function(opt_cancel) {
+  if (opt_cancel) {
+    this.layer_delete_state_cache_();
+  }
+  this.get_top_layer().render();
+};
+
+
+layer.prototype.layer_delete_state_cache_ = function() {
+  for (var i in this.state) {
+    delete this.state[i];
+  }
+  for (var i in this.cache) {
+    delete this.cache[i];
+  }
+};
+
+
+layer.prototype.render_clear = function(opt_cancel) {
+  if (opt_cancel) {
+    this.layer_delete_state_cache_();
+  }
   layer.layers = [this];
   this.render();
 };

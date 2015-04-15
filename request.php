@@ -24,7 +24,7 @@ class request extends api {
   }
   
   public function get_requested($key) {
-    return $this->request[$key];
+    return isset($this->request[$key]) ? $this->request[$key] : null;
   }
   
   protected function error($str_exception) {

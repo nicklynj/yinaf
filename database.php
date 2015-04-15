@@ -136,8 +136,16 @@ class database extends mysqli {
   }
   
   public function uuid() {
-    $result = $this->query('select uuid()');
-    return $result['uuid()'];
+    $row = $this->query('select uuid()')->fetch_assoc();
+    return $row['uuid()'];
+  }
+  public function now() {
+    $row = $this->query('select now()')->fetch_assoc();
+    return $row['now()'];
+  }
+  public function timestampdiff($from) {
+    $row = $this->query('select timestampdiff(second, '.$this->escape($from).', now()) diff')->fetch_assoc();
+    return $row['diff'];
   }
   
   public function query($str) {
@@ -273,7 +281,35 @@ class database extends mysqli {
       $id = $attributes[$table . '_id'];
       unset($attributes[$table . '_id']);
       if ($attributes) {
-        $clauses = array();
+        if (
+          (isset($this->new_rows[$table])) and
+          (isset($this->new_rows[$table][$id]))
+        ) {
+          $row = $this->new_rows[$table][$id];
+        } else if (
+          (isset($this->old_rows[$table])) and
+          (isset($this->old_rows[$table][$id]))
+        ) {
+          $row = $this->old_rows[$table][$id];
+        } else {
+          $row = null;
+        }
+        if ($row) {
+          $mismatch_found = false;
+          foreach ($attributes as $key => &$value) {
+            if (
+              (!isset($row[$key])) or // [todo:remove this]
+              (strval($value) !== $row[$key]) or
+              (!(($value === null) and ($row[$key] === null)))
+            ) {
+              $mismatch_found = true;
+              break;
+            }
+          }
+          if (!$mismatch_found) {
+            continue;
+          }
+        }
         $this->query('update ' . $this->word($table) . ' set ' . implode(',',
           array_map(
             array(

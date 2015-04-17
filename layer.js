@@ -10,6 +10,7 @@ var layer = function() {
     }
   } else {
     this.state = this.get_top_layer().state;
+    this.cache = this.get_top_layer().cache;
   }
 };
 rocket.inherits(layer, cache);
@@ -127,11 +128,11 @@ layer.prototype.render_current = function(opt_cancel) {
 
 
 layer.prototype.layer_delete_state_cache_ = function() {
-  for (var i in this.state) {
-    delete this.state[i];
+  for (var key in this.state) {
+    delete this.state[key];
   }
-  for (var i in this.cache) {
-    delete this.cache[i];
+  for (var key in this.cache) {
+    delete this.cache[key];
   }
 };
 

@@ -25,7 +25,7 @@ class api {
   }
   public static function commit() {
     if (isset(self::$database_instance)) {
-      self::$database_instance->commit();
+      self::$database_instance->commit_transaction();
     }
   }
   protected function api($class, $function/* , $var_args */) {

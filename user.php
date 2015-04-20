@@ -11,6 +11,7 @@ class user extends api {
     if (
       $user = $this->database->get('user', array(
         'username' => $arguments['username'],
+        'deleted' => 0,
       ) + array_intersect_key($arguments, array_flip(configuration::$user_additional_columns)))
     ) {
       return $user;
@@ -50,7 +51,7 @@ class user extends api {
   public function logout() {
     if ($session = $this->resume()) {
       return $this->database->update('session', array(
-        'destroyed' => 1,
+        'deleted' => 1,
       ) + $session);
     }
   }
@@ -61,7 +62,7 @@ class user extends api {
         if (
           ($session = $this->database->get('session', array(
             'key' => $request->get_requested('key'),
-            'destroyed' => 0,
+            'deleted' => 0,
           ))) and
           ($this->database->timestampdiff($session['created_at']) < configuration::$session_max_age) and
           ($this->database->timestampdiff(max($session['used_at'], $session['created_at'])) < configuration::$session_expires)
@@ -117,7 +118,7 @@ class user extends api {
   }
   public function create($arguments) {
     $uuid = $this->database->uuid();
-    if ($this->database->insert('user', array(
+    if ($this->database->create('user', array(
       'uuid' => $uuid,
       'username' => $arguments['username'],
       'password' => hash('sha512', $uuid . $arguments['password']), 

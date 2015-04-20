@@ -174,7 +174,7 @@ class database extends mysqli {
     }
   }
 
-  public function commit() {
+  public function commit_transaction() {
     if (
       ($this->transaction_started) and
       (!$this->commits_disabled)

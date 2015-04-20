@@ -12,7 +12,7 @@ class crud extends authenticated {
     if (configuration::$database_root_column) {
       return array(
         configuration::$database_root_column => 
-          request::get_last_request()->get_requested(configuration::$database_root_column)
+          request::get_request()->get_requested(configuration::$database_root_column)
       );
     } else {
       return array();

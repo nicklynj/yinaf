@@ -118,7 +118,7 @@ class database extends mysqli {
   }
   
   public function __destruct() {
-    $this->commit();
+    $this->commit_transaction();
   }
   
   public function get_queries() {

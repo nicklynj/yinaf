@@ -10,7 +10,7 @@ class request extends api {
     self::$last_request = $this;
   }
   
-  public static function get_last_request() {
+  public static function get_request() {
     return self::$last_request;
   }
   

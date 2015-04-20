@@ -57,7 +57,7 @@ class user extends api {
   }
   private function get_session() {
     if (!isset(self::$session)) {
-      $request = request::get_last_request();
+      $request = request::get_request();
       if ($request->get_class_name() === 'request_json') {
         if (
           ($session = $this->database->get('session', array(
@@ -83,11 +83,11 @@ class user extends api {
     if (!isset(self::$session)) {
       if ($session = $this->get_session()) {
         if (configuration::$database_root_user) {
-          if ($session['user_id'] == request::get_last_request()->get_requested('user_id')) {
+          if ($session['user_id'] == request::get_request()->get_requested('user_id')) {
             self::$session = $session;
           }
         } else if (configuration::$database_user_client) {
-          $client_id = request::get_last_request()->get_requested('client_id');
+          $client_id = request::get_request()->get_requested('client_id');
           if ($this->database->get('user_client', array(
             'user_id' => $session['user_id'],
             'client_id' => $client_id,

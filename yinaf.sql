@@ -6,17 +6,18 @@
   `deleted` tinyint(1) NOT NULL DEFAULT '0',
   PRIMARY KEY (`user_id`),
   UNIQUE KEY `username` (`username`)
-);
+) ENGINE=InnoDB;
 
 CREATE TABLE `session` (
   `session_id` int(10) unsigned NOT NULL AUTO_INCREMENT,
   `user_id` int(10) unsigned NOT NULL,
-  `destroyed` tinyint(1) NOT NULL DEFAULT '0',
   `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `created_by` int(10) unsigned NOT NULL,
+  `used_at` timestamp NOT NULL DEFAULT '0000-00-00 00:00:00',
+  `used_by` int(10) unsigned NOT NULL DEFAULT '0',
+  `deleted` tinyint(1) NOT NULL DEFAULT '0',
   `key` varchar(128) COLLATE latin1_general_ci NOT NULL,
   PRIMARY KEY (`session_id`),
   UNIQUE KEY `key` (`key`),
-  KEY `user_id` (`user_id`),
-  CONSTRAINT `session_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `user` (`user_id`)
-);
-
+  FOREIGN KEY (`user_id`) references `user` (`user_id`)
+) ENGINE=InnoDB;

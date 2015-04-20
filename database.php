@@ -281,7 +281,7 @@ class database extends mysqli {
       $id = $attributes[$table . '_id'];
       unset($attributes[$table . '_id']);
       if ($attributes) {
-        if (
+        /* if (
           (isset($this->new_rows[$table])) and
           (isset($this->new_rows[$table][$id]))
         ) {
@@ -298,7 +298,6 @@ class database extends mysqli {
           $mismatch_found = false;
           foreach ($attributes as $key => &$value) {
             if (
-              (!isset($row[$key])) or // [todo:remove this]
               (strval($value) !== $row[$key]) or
               (!(($value === null) and ($row[$key] === null)))
             ) {
@@ -309,7 +308,7 @@ class database extends mysqli {
           if (!$mismatch_found) {
             continue;
           }
-        }
+        } */
         $this->query('update ' . $this->word($table) . ' set ' . implode(',',
           array_map(
             array(

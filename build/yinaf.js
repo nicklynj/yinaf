@@ -1,10 +1,19 @@
 
 
 
+var envoy = function() {};
+rocket.inherits(envoy, rocket.EventTarget);
+
+
+
 var state = function() {
   this.state = {};
+  this.envoy = state.envoy = state.envoy || (new envoy());
 };
 rocket.inherits(state, rocket.EventTarget);
+
+
+state.envoy;
 
 
 
@@ -395,6 +404,9 @@ var layer = function() {
     if (this.get_previous_layer()) {
       this.state = rocket.clone(this.get_previous_layer().state);
     }
+  } else {
+    this.state = this.get_top_layer().state;
+    this.cache = this.get_top_layer().cache;
   }
 };
 rocket.inherits(layer, cache);
@@ -409,6 +421,11 @@ layer.prototype.get_previous_layer = function() {
       return layer.layers[i - 1];
     }
   }
+};
+
+
+layer.prototype.get_top_layer = function() {
+  return layer.layers[layer.layers.length - 1];
 };
 
 
@@ -450,8 +467,10 @@ layer.prototype.layer_previous_container_;
 
 
 layer.prototype.render = function(opt_parent) {
+  if (this.get_class_names_()[0] === 'layer') {
+    rocket.EventTarget.removeAllEventListeners();
+  }
   var container = rocket.createElement('div');
-  rocket.EventTarget.removeAllEventListeners();
   this.decorate(container);
   if (container.innerHTML()) {
     var containers = [];
@@ -473,6 +492,7 @@ layer.prototype.render = function(opt_parent) {
     }
     this.layer_previous_container_ = containers[0];
     this.dispatchEvent('render');
+    this.envoy.dispatchEvent('render');
   }
 };
 
@@ -495,7 +515,28 @@ layer.prototype.render_previous = function(opt_cancel) {
 };
 
 
-layer.prototype.render_clear = function() {
+layer.prototype.render_current = function(opt_cancel) {
+  if (opt_cancel) {
+    this.layer_delete_state_cache_();
+  }
+  this.get_top_layer().render();
+};
+
+
+layer.prototype.layer_delete_state_cache_ = function() {
+  for (var key in this.state) {
+    delete this.state[key];
+  }
+  for (var key in this.cache) {
+    delete this.cache[key];
+  }
+};
+
+
+layer.prototype.render_clear = function(opt_cancel) {
+  if (opt_cancel) {
+    this.layer_delete_state_cache_();
+  }
   layer.layers = [this];
   this.render();
 };
@@ -577,6 +618,5 @@ var exception = function() {
 
 
 exception.prototype.handle = function(exception) {
-  
-  alert('file:"' + exception.file + '", line:"' + exception.line + '", message:"' + exception.message + '"');
+  alert('file:"' + (exception.file || exception.fileName) + '", line:"' + (exception.line || exception.lineNumber) + '", message:"' + exception.message + '"');
 };

@@ -21,3 +21,11 @@ CREATE TABLE `session` (
   UNIQUE KEY `key` (`key`),
   FOREIGN KEY (`user_id`) references `user` (`user_id`)
 ) ENGINE=InnoDB;
+
+CREATE TABLE `yinaf` (
+  `yinaf_id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `table` varchar(255) NOT NULL,
+  `json_columns` varchar(65000) NOT NULL,
+  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`yinaf_id`)
+) ENGINE=InnoDB;

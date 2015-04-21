@@ -117,6 +117,13 @@ class database extends mysqli {
     return $results;
   }
   
+  // private $tables = array();
+  // public function describe($table) {
+    // if (!$this->tables) {
+      // $this->tables = 
+    // }
+  // }
+  
   public function __destruct() {
     $this->commit_transaction();
   }
@@ -139,9 +146,13 @@ class database extends mysqli {
     $row = $this->query('select uuid()')->fetch_assoc();
     return $row['uuid()'];
   }
+  private $now = null;
   public function now() {
-    $row = $this->query('select now()')->fetch_assoc();
-    return $row['now()'];
+    if ($this->now) {
+      $row = $this->query('select now()')->fetch_assoc();
+      $this->now = $row['now()'];
+    }
+    return $this->now;
   }
   public function timestampdiff($from) {
     $row = $this->query('select timestampdiff(second, '.$this->escape($from).', now()) diff')->fetch_assoc();
@@ -208,11 +219,9 @@ class database extends mysqli {
       }
       $this->old_rows = array();
       $this->new_rows = array();
+      $this->now = null;
       $this->query('commit');
       $this->transaction_started = false;
-      return true;
-    } else {
-      return false;
     }
   }
  

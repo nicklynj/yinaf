@@ -331,7 +331,7 @@ cache.prototype.flush_get_updates_from_negative_pointers = function(calls, alias
           (negative_pointers[j].self) &&
           (negative_pointers[j].value === pointer.value)
         ) {
-          var value = '=' + negative_pointers[j].alias + '.' + pointer.table + '_id';
+          var value = '=' + negative_pointers[j].alias + '.' + negative_pointers[j].table + '_id';
           break;
         }
       }

@@ -398,7 +398,6 @@ class database extends mysqli {
         $this->descriptions[$database_name][$row['table']] = $row;
       }
       if (isset($this->descriptions[$database_name][$table])) {
-        // [todo:check if it's old]
         if (
           (!$this->described) and
           ($this->timestampdiff($this->descriptions[$database_name][$table]['updated_at']) > 3600)

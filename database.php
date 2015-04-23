@@ -216,12 +216,12 @@ class database extends mysqli {
     $default_row = $this->get_default_row($table);
     foreach ($attributes_array_indexed as $index => &$attributes_array_index) {
       $this->query('insert into ' . $this->word($table) . ' ' . 
-        ' (' . ($attributes_array_index ? implode(',', array_map(
+        ' (' . ($attributes_array_index[0] ? implode(',', array_map(
             array($this, 'word'), 
             array_fill(0, count($attributes_array_index[0]), $table),
             array_keys($attributes_array_index[0])
         )) : '') . ') values ' .
-        implode(',', $attributes_array_index ? array_map(
+        implode(',', $attributes_array_index[0] ? array_map(
           array($this, 'escape_attributes'), 
           array_fill(0, count($attributes_array_index), $table),
           $attributes_array_index
@@ -230,7 +230,7 @@ class database extends mysqli {
       $last_insert_id = $this->insert_id;
       for ($i = 0; isset($attributes_array_index[$i]); ++$i) {
         $id = $this->insert_id - (count($attributes_array_index) - $i - 1) * configuration::$database_auto_increment_increment;
-        $this->new_rows[$table][$id] = $rows[$id] = $this->stringify($table, 
+        $rows[$id] = $this->stringify($table, 
           $attributes_array_index[$i] + 
           array($table . '_id' => $id) +
           $default_row

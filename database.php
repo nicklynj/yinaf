@@ -126,14 +126,14 @@ class database extends mysqli {
       '1';
   }
   private function escape_attributes($table, $attributes) {
-    return '(' . implode(',', 
+    return $attributes ? ('(' . implode(',', 
       array_map(
         array($this, 'escape'), 
         array_fill(0, count($attributes), $table),
         array_keys($attributes), 
         array_values($attributes)
       )
-    ) . ')';
+    ) . ')') : '()';
   }
   private function get_database_name() {
     if (isset($this->database_name)) {
@@ -221,11 +221,11 @@ class database extends mysqli {
             array_fill(0, count($attributes_array_index[0]), $table),
             array_keys($attributes_array_index[0])
         )) : '') . ') values ' .
-        implode(',', $attributes_array_index[0] ? array_map(
+        implode(',', array_map(
           array($this, 'escape_attributes'), 
           array_fill(0, count($attributes_array_index), $table),
           $attributes_array_index
-        ) : '()')
+        ))
       );
       $last_insert_id = $this->insert_id;
       for ($i = 0; isset($attributes_array_index[$i]); ++$i) {

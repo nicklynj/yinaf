@@ -144,3 +144,12 @@ layer.prototype.render_clear = function(opt_cancel) {
   layer.layers = [this];
   this.render();
 };
+
+
+layer.prototype.render_replace = function(opt_cancel) {
+  if (opt_cancel) {
+    this.layer_delete_state_cache_();
+  }
+  layer.layers.splice(layer.layers.length - 2, 1);
+  this.render();
+};

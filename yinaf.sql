@@ -27,5 +27,6 @@ CREATE TABLE `yinaf` (
   `table` varchar(255) NOT NULL,
   `json_columns` varchar(65000) NOT NULL,
   `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (`yinaf_id`)
+  PRIMARY KEY (`yinaf_id`),
+  UNIQUE KEY `table` (`table`)
 ) ENGINE=InnoDB;

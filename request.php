@@ -29,7 +29,7 @@ class request extends api {
   
   protected function error($str_exception) {
     if (isset($this->database)) {
-      $this->database->disable_commits();
+      $this->database->rollback_transaction();
     }
     if (is_string($str_exception)) {
       throw new Exception($str_exception);

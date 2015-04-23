@@ -23,7 +23,7 @@ class api {
   public static function get_calls() {
     return self::$calls;
   }
-  public static function commit() {
+  public static function commit_transaction() {
     if (isset(self::$database_instance)) {
       self::$database_instance->commit_transaction();
     }

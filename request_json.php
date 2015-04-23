@@ -29,7 +29,7 @@ class request_json extends request {
           ) : 
           array()
         ));
-        api::commit();
+        api::commit_transaction();
         die($result);
       } catch (Exception $e) {
         die(json_encode(array(
@@ -39,7 +39,9 @@ class request_json extends request {
             'code' => $e->getCode(),
             'file' => $e->getFile(),
             'line' => $e->getLine(),
-          ),
+          ) + (configuration::$debug ? array(
+            'trace' => $e->getTrace(),
+          ) : array()),
         )));
       }
     }
@@ -51,6 +53,8 @@ class request_json extends request {
   
   public function shutdown_function() {
     if ($error = error_get_last()) {
+      var_dump(__LINE__);
+      var_dump(debug_backtrace());
       die(json_encode(array(
         'success' => false,
         'result' => array(

@@ -56,27 +56,25 @@ class user extends api {
     }
   }
   private function get_session() {
-    if (!isset(self::$session)) {
-      $request = request::get_request();
-      if ($request->get_class_name() === 'request_json') {
-        if (
-          ($session = $this->database->get('session', array(
-            'key' => $request->get_requested('key'),
-            'deleted' => 0,
-          ))) and
-          ($this->database->timestampdiff($session['created_at']) < configuration::$session_max_age) and
-          ($this->database->timestampdiff(max($session['used_at'], $session['created_at'])) < configuration::$session_expires)
-        ) {
-          return $this->database->update('session', array(
-            'used_at' => $this->database->now(),
-            'used_by' => $this->inet_aton($_SERVER['REMOTE_ADDR']),
-          ) + $session);
-        }  
-      } else {
-        return array(
-          'user_id' => $request->get_requested('user_id'),
-        );
-      }
+    $request = request::get_request();
+    if (configuration::$user_use_requested_session_key) {
+      if (
+        ($session = $this->database->get('session', array(
+          'key' => $request->get_requested('key'),
+          'deleted' => 0,
+        ))) and
+        ($this->database->timestampdiff($session['created_at']) < configuration::$session_max_age) and
+        ($this->database->timestampdiff(max($session['used_at'], $session['created_at'])) < configuration::$session_expires)
+      ) {
+        return $this->database->update('session', array(
+          'used_at' => $this->database->now(),
+          'used_by' => $this->inet_aton($_SERVER['REMOTE_ADDR']),
+        ) + $session);
+      }  
+    } else if (configuration::$user_use_requested_user_id) {
+      return array(
+        'user_id' => $request->get_requested('user_id'),
+      );
     }
   }
   public function resume() {
@@ -98,8 +96,6 @@ class user extends api {
             );
             self::$session = $session;
           }
-        } else {
-          self::$session = $session;
         }
       }
     }
@@ -118,12 +114,22 @@ class user extends api {
   }
   public function create($arguments) {
     $uuid = $this->database->uuid();
-    if ($this->database->create('user', array(
-      'uuid' => $uuid,
-      'username' => $arguments['username'],
-      'password' => hash('sha512', $uuid . $arguments['password']), 
-    ) + array_intersect_key($arguments, array_flip(configuration::$user_additional_columns)))) {
-      return $this->login($arguments);
+    if (
+      (
+        configuration::$user_anonymous_create or 
+        $this->resume()
+      ) and
+      ($user = $this->database->create('user', array(
+        'uuid' => $uuid,
+        'username' => $arguments['username'],
+        'password' => hash('sha512', $uuid . $arguments['password']), 
+      ) + array_intersect_key($arguments, array_flip(configuration::$user_additional_columns))))
+    ) {
+      if (configuration::$user_login_after_create) {
+        return $this->login($arguments);
+      } else {
+        return $user;
+      }
     }
   }
   public function update($attributes) {

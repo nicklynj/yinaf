@@ -26,5 +26,9 @@ abstract class configuration {
   public static $user_updatable_columns_black_list = array();
   public static $user_track_failed_logins = false;
   public static $user_max_failed_logins = null;
+  public static $user_use_requested_session_key = true;
+  public static $user_use_requested_user_id = false;
+  public static $user_login_after_create = true;
+  public static $user_anonymous_create = true;
 
 }

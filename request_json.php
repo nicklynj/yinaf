@@ -53,8 +53,6 @@ class request_json extends request {
   
   public function shutdown_function() {
     if ($error = error_get_last()) {
-      var_dump(__LINE__);
-      var_dump(debug_backtrace());
       die(json_encode(array(
         'success' => false,
         'result' => array(

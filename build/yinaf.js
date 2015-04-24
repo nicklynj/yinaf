@@ -347,7 +347,7 @@ cache.prototype.flush_get_updates_from_negative_pointers = function(calls, alias
           (negative_pointers[j].self) &&
           (negative_pointers[j].value === pointer.value)
         ) {
-          var value = '=' + negative_pointers[j].alias + '.' + pointer.table + '_id';
+          var value = '=' + negative_pointers[j].alias + '.' + negative_pointers[j].table + '_id';
           break;
         }
       }
@@ -416,11 +416,7 @@ layer.layers = [];
 
 
 layer.prototype.get_previous_layer = function() {
-  for (var i = 0; layer.layers[i]; ++i) {
-    if (layer.layers[i] === this) {
-      return layer.layers[i - 1];
-    }
-  }
+  return layer.layers[layer.layers.length - 2];
 };
 
 
@@ -500,6 +496,16 @@ layer.prototype.render = function(opt_parent) {
 layer.prototype.decorate = function() {};
 
 
+layer.prototype.layer_delete_state_cache_ = function() {
+  for (var key in this.state) {
+    delete this.state[key];
+  }
+  for (var key in this.cache) {
+    delete this.cache[key];
+  }
+};
+
+
 layer.prototype.render_previous = function(opt_cancel) {
   if (opt_cancel) {
     layer.layers.pop();
@@ -515,21 +521,27 @@ layer.prototype.render_previous = function(opt_cancel) {
 };
 
 
-layer.prototype.render_current = function(opt_cancel) {
-  if (opt_cancel) {
-    this.layer_delete_state_cache_();
-  }
-  this.get_top_layer().render();
+layer.prototype.render_previous_without_state = function() {
+  rocket.EventTarget.removeAllEventListeners();
+  this.flush(function() {
+    layer.layers.pop();
+    layer.layers[layer.layers.length - 1].render();
+  });
 };
 
 
-layer.prototype.layer_delete_state_cache_ = function() {
-  for (var key in this.state) {
-    delete this.state[key];
+layer.prototype.render_previous_without_cache = function() {
+  layer.layers[layer.layers.length - 2].state = this.state;
+  layer.layers.pop();
+  layer.layers[layer.layers.length - 1].render();
+};
+
+
+layer.prototype.render_current = function(opt_cancel) {
+  if (opt_cancel) {
+    this.get_top_layer().layer_delete_state_cache_();
   }
-  for (var key in this.cache) {
-    delete this.cache[key];
-  }
+  this.get_top_layer().render();
 };
 
 
@@ -538,6 +550,15 @@ layer.prototype.render_clear = function(opt_cancel) {
     this.layer_delete_state_cache_();
   }
   layer.layers = [this];
+  this.render();
+};
+
+
+layer.prototype.render_replace = function(opt_cancel) {
+  if (opt_cancel) {
+    this.layer_delete_state_cache_();
+  }
+  layer.layers.splice(layer.layers.length - 2, 1);
   this.render();
 };
 

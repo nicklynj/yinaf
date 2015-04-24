@@ -80,19 +80,22 @@ class user extends api {
   public function resume() {
     if (!isset(self::$session)) {
       if ($session = $this->get_session()) {
+        $request = request::get_request();
         if (configuration::$database_root_user) {
-          if ($session['user_id'] == request::get_request()->get_requested('user_id')) {
+          if ($session['user_id'] == $request->get_requested('user_id')) {
             self::$session = $session;
           }
         } else if (configuration::$database_user_client) {
-          $client_id = request::get_request()->get_requested('client_id');
-          if ($this->database->get('user_client', array(
-            'user_id' => $session['user_id'],
-            'client_id' => $client_id,
-            'deleted' => 0,
-          ))) {
+          if (
+            ($session['user_id'] == $request->get_requested('user_id')) and
+            ($this->database->get('user_client', array(
+              'user_id' => $session['user_id'],
+              'client_id' => $request->get_requested('client_id'),
+              'deleted' => 0,
+            )))
+          ) {
             $this->database->select_db(
-              configuration::$database_client_prefix . '_' . $client_id
+              configuration::$database_client_prefix . '_' . $request->get_requested('client_id')
             );
             self::$session = $session;
           }

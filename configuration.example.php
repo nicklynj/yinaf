@@ -8,6 +8,7 @@ abstract class configuration {
   public static $database_password = 'password';
   public static $database_host = 'example.com';
   public static $database_name = 'example';
+  public static $database_auditing = false;
   
   public static $database_auto_increment_increment = 1;
   

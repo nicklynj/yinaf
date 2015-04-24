@@ -2,18 +2,30 @@
 
 class database extends mysqli {
 
-  private $queries = array();
-  private $transaction_started = false;
-  private $old_rows = array();
-  private $new_rows = array();
-  private $descriptions = array();
-  private $database_name = null;
-  private $now = null;
-  private $timestampdiffs = array();
-  private $described = false;
+  private $queries;
+  private $transaction_started;
+  private $old_rows;
+  private $new_rows;
+  private $descriptions;
+  private $database_name;
+  private $now;
+  private $timestampdiffs;
+  private $described;
 
+  private function initialize() {
+    $this->queries = array();
+    $this->transaction_started = false;
+    $this->old_rows = array();
+    $this->new_rows = array();
+    $this->descriptions = array();
+    $this->database_name = null;
+    $this->now = null;
+    $this->timestampdiffs = array();
+    $this->described = false;
+  }
   private function start_transaction() {
     if (!$this->transaction_started) {
+      $this->initialize();
       parent::query('start transaction');
       $this->transaction_started = true;
     }
@@ -197,6 +209,66 @@ class database extends mysqli {
     }
     return $attributes;
   }
+  private function audit() {
+    foreach ($this->old_rows as $table => &$rows) {
+      if (isset($this->new_rows[$table])) {
+        foreach ($rows as $id => &$row) {
+          if (isset($this->new_rows[$table][$id])) {
+            $this->new_rows[$table][$id] = array_diff_assoc(
+              $this->new_rows[$table][$id],
+              $row
+            );
+            $row = array_intersect_key(
+              $row,
+              $this->new_rows[$table][$id]
+            );
+          } else {
+            unset($this->old_rows[$table][$id]);
+          }
+          unset($row);
+        }
+      } else {
+        unset($this->old_rows[$table]);
+      }
+      unset($rows);
+    }
+    $user_id = request::get_request()->get_requested('user_id');
+    $creates = array();
+    $updates = array();
+    foreach ($this->new_rows as $table => &$rows) {
+      foreach ($rows as $id => &$row) {
+        if (
+          (isset($this->old_rows[$table])) and
+          (isset($this->old_rows[$table][$id]))
+        ) {
+          foreach ($row as $column => &$value) {
+            if (is_string($value) or ($value === null)) {
+              $updates[] = array(
+                'table' => $table,
+                'id' => $id,
+                'column' => $column,
+                'old_value' => $this->old_rows[$table][$id][$column],
+                'new_value' => $value,
+                'user_id' => $user_id,
+              );
+            }
+          }
+        } else {
+          $creates[] = array(
+            'table' => $table,
+            'id' => $id,
+            'user_id' => $user_id,
+          );
+        }
+      }
+    }
+    if ($creates) {
+      $this->create('audit_created', $creates);
+    }
+    if ($updates) {
+      $this->create('audit_updated', $updates);
+    }
+  }
   
   public function __destruct() {
     $this->commit_transaction();
@@ -227,10 +299,13 @@ class database extends mysqli {
           $attributes_array_index
         ))
       );
+      if (!isset($this->new_rows[$table])) {
+        $this->new_rows[$table] = array();
+      }
       $last_insert_id = $this->insert_id;
       for ($i = 0; isset($attributes_array_index[$i]); ++$i) {
         $id = $this->insert_id - (count($attributes_array_index) - $i - 1) * configuration::$database_auto_increment_increment;
-        $rows[$id] = $this->stringify($table, 
+        $this->new_rows[$table][$id] = $rows[$id] = $this->stringify($table, 
           $attributes_array_index[$i] + 
           array($table . '_id' => $id) +
           $default_row
@@ -265,6 +340,12 @@ class database extends mysqli {
           }
         }
         $result_row[$column] = $value;
+      }
+      if (!isset($this->old_rows[$table])) {
+        $this->old_rows[$table] = array();
+      }
+      if (!isset($this->old_rows[$table][$row[$table . '_id']])) {
+        $this->old_rows[$table][$row[$table . '_id']] = $result_row;
       }
       $results[$row[$table . '_id']] = $result_row;
     }
@@ -302,7 +383,10 @@ class database extends mysqli {
           throw new Exception('match not found on table:"' . $table . '", id:"' . $id . '"');
         }
       }
-      $rows[$id] = $this->stringify($table, $attributes) + $rows[$id];
+      if (!isset($this->new_rows[$table])) {
+        $this->new_rows[$table] = array();
+      }
+      $this->new_rows[$table][$id] = $rows[$id] = $this->stringify($table, $attributes) + $rows[$id];
     }
     if ($all_numeric_keys) {
       return $rows;
@@ -426,7 +510,7 @@ class database extends mysqli {
     return $row['uuid()'];
   }
   public function now() {
-    if ($this->now) {
+    if (!$this->now) {
       $row = $this->query('select now()')->fetch_assoc();
       $this->now = $row['now()'];
     }
@@ -445,49 +529,17 @@ class database extends mysqli {
 
   public function rollback_transaction() {
     if ($this->transaction_started) {
-      $this->old_rows = array();
-      $this->new_rows = array();
-      $this->now = null;
-      $this->timestampdiffs = array();
       $this->query('rollback');
-      $this->transaction_started = false;
-      $this->described = false;
+      $this->initialize();
     }
   }
   public function commit_transaction() {
     if ($this->transaction_started) {
-      // if (class_exists('audit')) {
-        // foreach ($this->old_rows as $table => &$rows) {
-          // if (isset($this->new_rows[$table])) {
-            // foreach ($rows as $id => &$row) {
-              // if (isset($this->new_rows[$table][$id])) {
-                // $this->new_rows[$table][$id] = array_diff_assoc(
-                  // $this->new_rows[$table][$id],
-                  // $row
-                // );
-                // $row = array_intersect_key(
-                  // $row,
-                  // $this->new_rows[$table][$id]
-                // );
-              // } else {
-                // unset($this->old_rows[$table][$id]);
-              // }
-              // unset($row);
-            // }
-          // } else {
-            // unset($this->old_rows[$table]);
-          // }
-          // unset($rows);
-        // }
-        // new audit($this->old_rows, $this->new_rows);
-      // }
-      $this->old_rows = array();
-      $this->new_rows = array();
-      $this->now = null;
-      $this->timestampdiffs = array();
+      if (configuration::$database_auditing) {
+        $this->audit();
+      }
       $this->query('commit');
-      $this->transaction_started = false;
-      $this->described = false;
+      $this->initialize();
     }
   }  
 

@@ -24,9 +24,35 @@ CREATE TABLE `session` (
 
 CREATE TABLE `yinaf` (
   `yinaf_id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `table` varchar(255) NOT NULL,
   `json_columns` varchar(65000) NOT NULL,
-  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`yinaf_id`),
   UNIQUE KEY `table` (`table`)
+) ENGINE=InnoDB;
+
+CREATE TABLE `audit_created` (
+  `audit_created_id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `table` varchar(255) NOT NULL,
+  `id` int(10) unsigned NOT NULL,
+  `user_id` int(10) unsigned DEFAULT NULL,
+  `timestamp` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`audit_created_id`),
+  KEY `id` (`id`,`table`),
+  KEY `user` (`user`),
+  KEY `timestamp` (`timestamp`,`table`)
+) ENGINE=InnoDB;
+
+CREATE TABLE `audit_updated` (
+  `audit_updated_id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `table` varchar(255) NOT NULL,
+  `id` int(10) unsigned NOT NULL,
+  `user_id` int(10) unsigned DEFAULT NULL,
+  `timestamp` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `column` varchar(255) NOT NULL,
+  `old_value` varchar(30000) DEFAULT NULL,
+  `new_value` varchar(30000) DEFAULT NULL,
+  PRIMARY KEY (`audit_updated_id`),
+  KEY `id` (`id`,`table`),
+  KEY `timestamp` (`timestamp`,`table`)
 ) ENGINE=InnoDB;

@@ -70,27 +70,18 @@ layer.prototype.render = function(opt_parent) {
   if (this.get_class_names_()[0] === 'layer') {
     rocket.EventTarget.removeAllEventListeners();
   }
-  var container = rocket.createElement('div');
+  var container = rocket.createElement('div').addClass(this.get_class_names_());
   this.decorate(container);
   if (container.innerHTML()) {
-    var containers = [];
-    var class_names = this.get_class_names_();
-    for (var i = 0; class_names[i]; ++i) {
-      containers.push(rocket.createElement('div').addClass(class_names[i]));
-      if (i) {
-        containers[i - 1].appendChild(containers[i]);
-      }
-    }
-    containers[containers.length - 1].appendChild(container);
     if (
       (this.layer_previous_container_) &&
       (this.layer_previous_container_.parentNode().length)
     ) {
-      this.layer_previous_container_.parentNode().replaceChild(containers[0], this.layer_previous_container_);
+      this.layer_previous_container_.parentNode().replaceChild(container, this.layer_previous_container_);
     } else {
-      (opt_parent || rocket.$('body').innerHTML('')).appendChild(containers[0]);
+      (opt_parent || rocket.$('body').innerHTML('')).appendChild(container);
     }
-    this.layer_previous_container_ = containers[0];
+    this.layer_previous_container_ = container;
     this.dispatchEvent('render');
     this.envoy.dispatchEvent('render');
   }

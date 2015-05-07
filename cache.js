@@ -42,12 +42,12 @@ cache.prototype.read = function(table, ids_or_attributes) {
     caches.push(layers[i].cache);
   }
   if (rocket.equal([table + '_id'], rocket.keys(attributes))) {
-    return this.read_results_(caches, table, attributes[table + '_id']);
+    return this.cache_read_results_(caches, table, attributes[table + '_id']);
   } else {
     var matches = {};
     var mismatches = {};
     for (var i = caches.length - 1; i > -1; --i) {
-      this.read_helper_(matches, mismatches, caches[i], table, attributes);
+      this.cache_read_helper_(matches, mismatches, caches[i], table, attributes);
     }
     var ids = [];
     for (var id in matches) {
@@ -55,12 +55,12 @@ cache.prototype.read = function(table, ids_or_attributes) {
         ids.push(id);
       }
     }
-    return this.read_results_(caches, table, ids);
+    return this.cache_read_results_(caches, table, ids);
   }
 };
 
 
-cache.prototype.read_helper_ = function(matches, mismatches, cache, table, attributes) {
+cache.prototype.cache_read_helper_ = function(matches, mismatches, cache, table, attributes) {
   if (table in cache) {
     for (var id in cache[table]) {
       if (!(id in mismatches)) {
@@ -89,7 +89,7 @@ cache.prototype.read_helper_ = function(matches, mismatches, cache, table, attri
 };
 
 
-cache.prototype.read_results_ = function(caches, table, ids) {
+cache.prototype.cache_read_results_ = function(caches, table, ids) {
   var results = {};
   for (var i = 0; ids[i]; ++i) {
     results[ids[i]] = {};
@@ -115,15 +115,25 @@ cache.prototype.read_results_ = function(caches, table, ids) {
 
 
 cache.prototype.update = function(table, attributes) {
+  return this.cache_update_(this.cache, table, attributes);
+};
+
+
+cache.prototype.cache_update_ = function(target, table, attributes) {
   var id = attributes[table + '_id'];
-  if (!(table in this.cache)) {
-    this.cache[table] = {};
+  if (!(table in target)) {
+    target[table] = {};
   }
-  if (!(id in this.cache[table])) {
-    this.cache[table][id] = {};
+  if (!(id in target[table])) {
+    target[table][id] = {};
   }
-  rocket.extend(this.cache[table][id], attributes);
+  rocket.extend(target[table][id], attributes);
   return this.get(table, id);
+};
+
+
+cache.prototype.extend = function(table, attributes) {
+  return this.cache_update_(cache.cache, table, attributes);
 };
 
 

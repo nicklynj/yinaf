@@ -387,4 +387,3 @@ cache.prototype.flush_handle_result = function(result, alias_to_table, negative_
     cache.cache[alias_to_table[alias]][result[alias][alias_to_table[alias] + '_id']] = result[alias];
   }
 };
-

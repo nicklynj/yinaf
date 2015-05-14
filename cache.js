@@ -388,3 +388,17 @@ cache.prototype.flush_handle_result = function(result, alias_to_table, negative_
   }
 };
 
+
+cache.prototype.propagate = function() {
+  var from = this.cache;
+  var to = this.get_previous_layer().cache;
+  for (var table in from) {
+    if (!(table in to)) {
+      to[table] = {};
+    }
+    for (var id in from[table]) {
+      to[table][id] = from[table][id];
+    }
+    delete from[table];
+  }
+};

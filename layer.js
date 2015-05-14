@@ -149,10 +149,11 @@ layer.prototype.render_clear = function(opt_cancel) {
 };
 
 
-layer.prototype.render_replace = function(opt_cancel) {
+layer.prototype.render_replace = function(opt_cancel, opt_replacements) {
+  var replacements = opt_replacements || 1;
   if (opt_cancel) {
     this.layer_delete_state_cache_();
   }
-  layer.layers.splice(layer.layers.length - 2, 1);
+  layer.layers.splice(layer.layers.length - 1 - replacements, replacements);
   this.render();
 };

@@ -70,6 +70,12 @@ class crud extends authenticated {
     foreach ($queries as $query) {
       $result = $this->database->query($query . ' limit 100');
       while ($row = $result->fetch_assoc()) {
+        foreach ($row as $key => &$value) {
+          if (strpos($key, 'json_') === 0) {
+            $row[substr($key, 5)] = json_decode($value);
+            unset($row[$key]);
+          }
+        }
         $results[] = $row;
       }
       $results = array_values(array_intersect_key($results, array_unique(array_map('serialize', $results))));

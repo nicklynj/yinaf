@@ -390,8 +390,11 @@ cache.prototype.flush_handle_result = function(result, alias_to_table, negative_
 
 
 cache.prototype.propagate = function() {
-  var from = this.cache;
-  var to = this.get_previous_layer().cache;
+  this.cache_propagate(this.cache, this.get_previous_layer().cache);
+};
+
+
+cache.prototype.cache_propagate = function(from, to) {
   for (var table in from) {
     if (!(table in to)) {
       to[table] = {};

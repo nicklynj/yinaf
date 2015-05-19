@@ -91,16 +91,6 @@ layer.prototype.render = function(opt_parent) {
 layer.prototype.decorate = function() {};
 
 
-layer.prototype.layer_delete_state_cache_ = function() {
-  for (var key in this.state) {
-    delete this.state[key];
-  }
-  for (var key in this.cache) {
-    delete this.cache[key];
-  }
-};
-
-
 layer.prototype.render_previous = function(opt_cancel) {
   if (opt_cancel) {
     layer.layers.pop();
@@ -134,15 +124,29 @@ layer.prototype.render_previous_without_cache = function() {
 
 layer.prototype.render_current = function(opt_cancel) {
   if (opt_cancel) {
-    this.get_top_layer().layer_delete_state_cache_();
+    for (var key in this.state) {
+      delete this.state[key];
+    }
+    for (var key in this.cache) {
+      delete this.cache[key];
+    }
   }
   this.get_top_layer().render();
 };
 
 
+layer.prototype.layer_extend_state_cache_ = function(layers) {
+  for (var i = 0; layers[i]; ++i) {
+    rocket.extend(this.state, layer.layers[i].state);
+    this.cache_propagate(layer.layers[i].cache, this.cache);
+  }
+};
+
+
 layer.prototype.render_clear = function(opt_cancel) {
-  if (opt_cancel) {
-    this.layer_delete_state_cache_();
+  layer.layers.pop();
+  if (!opt_cancel) {
+    this.layer_extend_state_cache_(layer.layers);
   }
   layer.layers = [this];
   this.render();
@@ -151,9 +155,9 @@ layer.prototype.render_clear = function(opt_cancel) {
 
 layer.prototype.render_replace = function(opt_cancel, opt_replacements) {
   var replacements = opt_replacements || 1;
-  if (opt_cancel) {
-    this.layer_delete_state_cache_();
+  var layers = layer.layers.splice(layer.layers.length - 1 - replacements, replacements);
+  if (!opt_cancel) {
+    this.layer_extend_state_cache_(layers);
   }
-  layer.layers.splice(layer.layers.length - 1 - replacements, replacements);
   this.render();
 };

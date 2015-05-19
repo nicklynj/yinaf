@@ -137,8 +137,8 @@ layer.prototype.render_current = function(opt_cancel) {
 
 layer.prototype.layer_extend_state_cache_ = function(layers) {
   for (var i = 0; layers[i]; ++i) {
-    rocket.extend(this.state, layer.layers[i].state);
-    this.cache_propagate(layer.layers[i].cache, this.cache);
+    rocket.extend(this.state, layers[i].state);
+    this.cache_propagate(layers[i].cache, this.cache);
   }
 };
 

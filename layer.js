@@ -130,15 +130,18 @@ layer.prototype.render_current = function(opt_cancel) {
     for (var key in this.cache) {
       delete this.cache[key];
     }
+    this.layer_extend_state_cache_(layer.layers, false);
   }
   this.get_top_layer().render();
 };
 
 
-layer.prototype.layer_extend_state_cache_ = function(layers) {
+layer.prototype.layer_extend_state_cache_ = function(layers, propagate_cache) {
   for (var i = 0; layers[i]; ++i) {
     rocket.extend(this.state, layers[i].state);
-    this.cache_propagate(layers[i].cache, this.cache);
+    if (propagate_cache) {
+      this.cache_propagate(layers[i].cache, this.cache);
+    }
   }
 };
 
@@ -146,7 +149,7 @@ layer.prototype.layer_extend_state_cache_ = function(layers) {
 layer.prototype.render_clear = function(opt_cancel) {
   layer.layers.pop();
   if (!opt_cancel) {
-    this.layer_extend_state_cache_(layer.layers);
+    this.layer_extend_state_cache_(layer.layers, true);
   }
   layer.layers = [this];
   this.render();
@@ -157,7 +160,7 @@ layer.prototype.render_replace = function(opt_cancel, opt_replacements) {
   var replacements = opt_replacements || 1;
   var layers = layer.layers.splice(layer.layers.length - 1 - replacements, replacements);
   if (!opt_cancel) {
-    this.layer_extend_state_cache_(layers);
+    this.layer_extend_state_cache_(layers, true);
   }
   this.render();
 };

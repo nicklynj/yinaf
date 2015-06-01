@@ -66,7 +66,7 @@ layer.prototype.get_class_name_recursive_ = function(parent, opt_prefix) {
 layer.prototype.layer_previous_container_;
 
 
-layer.prototype.render = function(opt_parent) {
+layer.prototype.render = function(opt_parent, opt_before) {
   if (this.get_class_names_()[0] === 'layer') {
     rocket.EventTarget.removeAllEventListeners();
   }
@@ -79,11 +79,18 @@ layer.prototype.render = function(opt_parent) {
     ) {
       this.layer_previous_container_.parentNode().replaceChild(container, this.layer_previous_container_);
     } else {
-      (opt_parent || rocket.$('body').innerHTML('')).appendChild(container);
+      (opt_parent || rocket.$('body').innerHTML('')).insertBefore(container, opt_before);
     }
     this.layer_previous_container_ = container;
     this.dispatchEvent('render');
     this.envoy.dispatchEvent('render');
+  }
+};
+
+
+layer.prototype.render_remove = function() {
+  if (this.layer_previous_container_.parentNode().length) {
+    this.layer_previous_container_.parentNode().removeChild(this.layer_previous_container_);
   }
 };
 

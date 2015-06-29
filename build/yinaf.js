@@ -58,12 +58,12 @@ cache.prototype.read = function(table, ids_or_attributes) {
     caches.push(layers[i].cache);
   }
   if (rocket.equal([table + '_id'], rocket.keys(attributes))) {
-    return this.read_results_(caches, table, attributes[table + '_id']);
+    return this.cache_read_results_(caches, table, attributes[table + '_id']);
   } else {
     var matches = {};
     var mismatches = {};
     for (var i = caches.length - 1; i > -1; --i) {
-      this.read_helper_(matches, mismatches, caches[i], table, attributes);
+      this.cache_read_helper_(matches, mismatches, caches[i], table, attributes);
     }
     var ids = [];
     for (var id in matches) {
@@ -71,12 +71,12 @@ cache.prototype.read = function(table, ids_or_attributes) {
         ids.push(id);
       }
     }
-    return this.read_results_(caches, table, ids);
+    return this.cache_read_results_(caches, table, ids);
   }
 };
 
 
-cache.prototype.read_helper_ = function(matches, mismatches, cache, table, attributes) {
+cache.prototype.cache_read_helper_ = function(matches, mismatches, cache, table, attributes) {
   if (table in cache) {
     for (var id in cache[table]) {
       if (!(id in mismatches)) {
@@ -96,6 +96,7 @@ cache.prototype.read_helper_ = function(matches, mismatches, cache, table, attri
             } else {
               delete matches[id];
               mismatches[id] = true;
+              break;
             }
           }
         }
@@ -105,7 +106,7 @@ cache.prototype.read_helper_ = function(matches, mismatches, cache, table, attri
 };
 
 
-cache.prototype.read_results_ = function(caches, table, ids) {
+cache.prototype.cache_read_results_ = function(caches, table, ids) {
   var results = {};
   for (var i = 0; ids[i]; ++i) {
     results[ids[i]] = {};
@@ -131,15 +132,25 @@ cache.prototype.read_results_ = function(caches, table, ids) {
 
 
 cache.prototype.update = function(table, attributes) {
+  return this.cache_update_(this.cache, table, attributes);
+};
+
+
+cache.prototype.cache_update_ = function(target, table, attributes) {
   var id = attributes[table + '_id'];
-  if (!(table in this.cache)) {
-    this.cache[table] = {};
+  if (!(table in target)) {
+    target[table] = {};
   }
-  if (!(id in this.cache[table])) {
-    this.cache[table][id] = {};
+  if (!(id in target[table])) {
+    target[table][id] = {};
   }
-  rocket.extend(this.cache[table][id], attributes);
+  rocket.extend(target[table][id], attributes);
   return this.get(table, id);
+};
+
+
+cache.prototype.extend = function(table, attributes) {
+  return this.cache_update_(cache.cache, table, attributes);
 };
 
 
@@ -178,7 +189,9 @@ cache.prototype.flush = function(callback) {
   this.flush_get_updates(calls, alias_to_table);
   this.flush_get_updates_from_negative_pointers(calls, alias_to_table, negative_pointers);
   this.flush_collapse_updates(calls);
-  this.cache = {};
+  for (var table in this.cache) {
+    delete this.cache[table];
+  }
   if (calls.length) {
     var self = this;
     api('api', 'multiple', calls, function(result) {
@@ -395,6 +408,23 @@ cache.prototype.flush_handle_result = function(result, alias_to_table, negative_
 };
 
 
+cache.prototype.propagate = function() {
+  this.cache_propagate(this.cache, this.get_previous_layer().cache);
+};
+
+
+cache.prototype.cache_propagate = function(from, to) {
+  for (var table in from) {
+    if (!(table in to)) {
+      to[table] = {};
+    }
+    for (var id in from[table]) {
+      to[table][id] = from[table][id];
+    }
+    delete from[table];
+  }
+};
+
 
 
 var layer = function() {
@@ -462,48 +492,36 @@ layer.prototype.get_class_name_recursive_ = function(parent, opt_prefix) {
 layer.prototype.layer_previous_container_;
 
 
-layer.prototype.render = function(opt_parent) {
+layer.prototype.render = function(opt_parent, opt_before) {
   if (this.get_class_names_()[0] === 'layer') {
     rocket.EventTarget.removeAllEventListeners();
   }
-  var container = rocket.createElement('div');
+  var container = rocket.createElement('div').addClass(this.get_class_names_());
   this.decorate(container);
   if (container.innerHTML()) {
-    var containers = [];
-    var class_names = this.get_class_names_();
-    for (var i = 0; class_names[i]; ++i) {
-      containers.push(rocket.createElement('div').addClass(class_names[i]));
-      if (i) {
-        containers[i - 1].appendChild(containers[i]);
-      }
-    }
-    containers[containers.length - 1].appendChild(container);
     if (
       (this.layer_previous_container_) &&
       (this.layer_previous_container_.parentNode().length)
     ) {
-      this.layer_previous_container_.parentNode().replaceChild(containers[0], this.layer_previous_container_);
+      this.layer_previous_container_.parentNode().replaceChild(container, this.layer_previous_container_);
     } else {
-      (opt_parent || rocket.$('body').innerHTML('')).appendChild(containers[0]);
+      (opt_parent || rocket.$('body').innerHTML('')).insertBefore(container, opt_before);
     }
-    this.layer_previous_container_ = containers[0];
+    this.layer_previous_container_ = container;
     this.dispatchEvent('render');
     this.envoy.dispatchEvent('render');
   }
 };
 
 
-layer.prototype.decorate = function() {};
-
-
-layer.prototype.layer_delete_state_cache_ = function() {
-  for (var key in this.state) {
-    delete this.state[key];
-  }
-  for (var key in this.cache) {
-    delete this.cache[key];
+layer.prototype.render_remove = function() {
+  if (this.layer_previous_container_.parentNode().length) {
+    this.layer_previous_container_.parentNode().removeChild(this.layer_previous_container_);
   }
 };
+
+
+layer.prototype.decorate = function() {};
 
 
 layer.prototype.render_previous = function(opt_cancel) {
@@ -539,26 +557,44 @@ layer.prototype.render_previous_without_cache = function() {
 
 layer.prototype.render_current = function(opt_cancel) {
   if (opt_cancel) {
-    this.get_top_layer().layer_delete_state_cache_();
+    for (var key in this.state) {
+      delete this.state[key];
+    }
+    for (var key in this.cache) {
+      delete this.cache[key];
+    }
+    this.layer_extend_state_cache_(layer.layers, false);
   }
   this.get_top_layer().render();
 };
 
 
+layer.prototype.layer_extend_state_cache_ = function(layers, propagate_cache) {
+  for (var i = 0; layers[i]; ++i) {
+    rocket.extend(this.state, layers[i].state);
+    if (propagate_cache) {
+      this.cache_propagate(layers[i].cache, this.cache);
+    }
+  }
+};
+
+
 layer.prototype.render_clear = function(opt_cancel) {
-  if (opt_cancel) {
-    this.layer_delete_state_cache_();
+  layer.layers.pop();
+  if (!opt_cancel) {
+    this.layer_extend_state_cache_(layer.layers, true);
   }
   layer.layers = [this];
   this.render();
 };
 
 
-layer.prototype.render_replace = function(opt_cancel) {
-  if (opt_cancel) {
-    this.layer_delete_state_cache_();
+layer.prototype.render_replace = function(opt_cancel, opt_replacements) {
+  var replacements = opt_replacements || 1;
+  var layers = layer.layers.splice(layer.layers.length - 1 - replacements, replacements);
+  if (!opt_cancel) {
+    this.layer_extend_state_cache_(layers, true);
   }
-  layer.layers.splice(layer.layers.length - 2, 1);
   this.render();
 };
 

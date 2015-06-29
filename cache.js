@@ -180,10 +180,10 @@ cache.prototype.flush = function(callback) {
     var self = this;
     api('api', 'multiple', calls, function(result) {
       self.flush_handle_result(result, alias_to_table, negative_pointers, unresolved_negative_pointers);
-      callback();
+      callback.call(self);
     });
   } else {
-    callback();
+    callback.call(this);
   }
 };
 
@@ -403,7 +403,12 @@ cache.prototype.cache_propagate = function(from, to) {
       to[table] = {};
     }
     for (var id in from[table]) {
-      to[table][id] = from[table][id];
+      if (!(id in to[table])) {
+        to[table][id] = {};
+      }
+      for (var column in from[table][id]) {
+        to[table][id][column] = from[table][id][column];
+      }
     }
     delete from[table];
   }

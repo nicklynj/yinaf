@@ -80,6 +80,7 @@ cache.prototype.cache_read_helper_ = function(matches, mismatches, cache, table,
             } else {
               delete matches[id];
               mismatches[id] = true;
+              break;
             }
           }
         }

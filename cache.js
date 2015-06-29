@@ -172,7 +172,9 @@ cache.prototype.flush = function(callback) {
   this.flush_get_updates(calls, alias_to_table);
   this.flush_get_updates_from_negative_pointers(calls, alias_to_table, negative_pointers);
   this.flush_collapse_updates(calls);
-  this.cache = {};
+  for (var table in this.cache) {
+    delete this.cache[table];
+  }
   if (calls.length) {
     var self = this;
     api('api', 'multiple', calls, function(result) {

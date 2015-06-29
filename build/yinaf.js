@@ -196,10 +196,10 @@ cache.prototype.flush = function(callback) {
     var self = this;
     api('api', 'multiple', calls, function(result) {
       self.flush_handle_result(result, alias_to_table, negative_pointers, unresolved_negative_pointers);
-      callback();
+      callback.call(self);
     });
   } else {
-    callback();
+    callback.call(this);
   }
 };
 
@@ -419,7 +419,12 @@ cache.prototype.cache_propagate = function(from, to) {
       to[table] = {};
     }
     for (var id in from[table]) {
-      to[table][id] = from[table][id];
+      if (!(id in to[table])) {
+        to[table][id] = {};
+      }
+      for (var column in from[table][id]) {
+        to[table][id][column] = from[table][id][column];
+      }
     }
     delete from[table];
   }
@@ -527,13 +532,13 @@ layer.prototype.decorate = function() {};
 layer.prototype.render_previous = function(opt_cancel) {
   if (opt_cancel) {
     layer.layers.pop();
-    layer.layers[layer.layers.length - 1].render();
+    this.get_top_layer().render();
   } else {
-    layer.layers[layer.layers.length - 2].state = this.state;
+    this.get_previous_layer().state = this.state;
     rocket.EventTarget.removeAllEventListeners();
     this.flush(function() {
       layer.layers.pop();
-      layer.layers[layer.layers.length - 1].render();
+      this.get_top_layer().render();
     });
   }
 };
@@ -543,59 +548,58 @@ layer.prototype.render_previous_without_state = function() {
   rocket.EventTarget.removeAllEventListeners();
   this.flush(function() {
     layer.layers.pop();
-    layer.layers[layer.layers.length - 1].render();
+    this.get_top_layer().render();
   });
 };
 
 
 layer.prototype.render_previous_without_cache = function() {
-  layer.layers[layer.layers.length - 2].state = this.state;
+  this.get_previous_layer().state = this.state;
   layer.layers.pop();
-  layer.layers[layer.layers.length - 1].render();
+  this.get_top_layer().render();
 };
 
 
 layer.prototype.render_current = function(opt_cancel) {
   if (opt_cancel) {
-    for (var key in this.state) {
-      delete this.state[key];
-    }
-    for (var key in this.cache) {
-      delete this.cache[key];
-    }
-    this.layer_extend_state_cache_(layer.layers, false);
+    this.get_top_layer().cache = {};
+    this.get_top_layer().state = this.get_previous_layer() ?
+      rocket.clone(this.get_previous_layer().state) :
+      {};
   }
   this.get_top_layer().render();
 };
 
 
-layer.prototype.layer_extend_state_cache_ = function(layers, propagate_cache) {
-  for (var i = 0; layers[i]; ++i) {
-    rocket.extend(this.state, layers[i].state);
-    if (propagate_cache) {
-      this.cache_propagate(layers[i].cache, this.cache);
-    }
+layer.prototype.layer_propagate_cache_ = function(layers) {
+  for (var i = 0; layer.layers[i]; ++i) {
+    this.cache_propagate(layer.layers[i].cache, this.cache);
   }
 };
 
 
 layer.prototype.render_clear = function(opt_cancel) {
-  layer.layers.pop();
-  if (!opt_cancel) {
-    this.layer_extend_state_cache_(layer.layers, true);
+  if (opt_cancel) {
+    this.get_top_layer().state = {};
+    this.get_top_layer().cache = {};
+  } else {
+    this.layer_propagate_cache_(layer.layers);
   }
-  layer.layers = [this];
-  this.render();
+  layer.layers = [this.get_top_layer()];
+  this.get_top_layer().render();
 };
 
 
 layer.prototype.render_replace = function(opt_cancel, opt_replacements) {
   var replacements = opt_replacements || 1;
   var layers = layer.layers.splice(layer.layers.length - 1 - replacements, replacements);
-  if (!opt_cancel) {
-    this.layer_extend_state_cache_(layers, true);
+  if (opt_cancel) {
+    this.get_top_layer().state = {};
+    this.get_top_layer().cache = {};
+  } else {
+    this.layer_propagate_cache_(layers)
   }
-  this.render();
+  this.get_top_layer().render();
 };
 
 

@@ -1,6 +1,8 @@
 <?php
 
-class database extends mysqli {
+namespace yinaf;
+
+class database extends \mysqli {
 
   private $queries;
   private $transaction_started;
@@ -497,7 +499,7 @@ class database extends mysqli {
         if (isset($this->descriptions[$database_name][$table])) {
           return $this->descriptions[$database_name][$table];
         } else {
-          throw new Exception('table does not exist');
+          throw new Exception('table does not exist:"'.$table.'"');
         }
       }
     }

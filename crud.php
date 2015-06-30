@@ -1,5 +1,7 @@
 <?php
 
+namespace yinaf;
+
 class crud extends authenticated {
   protected $dictionary = false;
   public function __construct($opt_class = null) {

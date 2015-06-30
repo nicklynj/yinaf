@@ -1,5 +1,7 @@
 <?php
 
+namespace yinaf;
+
 class authenticated extends api {
   protected $session;
   public function __construct() {

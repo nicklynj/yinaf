@@ -1,5 +1,7 @@
 <?php
 
+namespace yinaf;
+
 class request extends api {
   
   protected $request;

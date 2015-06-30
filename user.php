@@ -1,5 +1,7 @@
 <?php
 
+namespace yinaf;
+
 class user extends api {
   private static $session;
   private function verify_password($user, $password) {

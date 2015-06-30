@@ -1,5 +1,7 @@
 <?php
 
+namespace yinaf;
+
 class api {
   private static $database_instance;
   protected $database;
@@ -14,7 +16,9 @@ class api {
         configuration::$database_name
       );
     }
-    $this->class_name = get_class($this);
+    $this->class_name = strpos(get_class($this), '\\') ? 
+      substr(get_class($this), strrpos(get_class($this), '\\') + 1) : 
+      get_class($this);
     $this->database = self::$database_instance;
   }
   public function get_class_name() {
@@ -36,7 +40,7 @@ class api {
       $calls_length = count(self::$calls);
     }
     $result = call_user_func_array(
-      array(class_exists($class) ? new $class() : new crud($class), $function),
+      array($this->api_get_object($class), $function),
       array_slice(func_get_args(), 2)
     );
     if (configuration::$debug) {
@@ -51,6 +55,27 @@ class api {
       );
     }
     return $result;
+  }
+  private function api_get_object($class) {
+    $namespaces = array();
+    if (strpos($class, '\\') !== false) {
+      $namespaces[] = '';
+    }
+    $namespaces[] = 'yinaf';
+    $namespaces[] = configuration::$php_include_path;
+    $class_name = explode('\\', get_class($this));
+    while ($class_name) {
+      array_pop($class_name);
+      if ($class_name) {
+        $namespaces[] = implode('\\', $class_name);
+      }
+    }
+    foreach ($namespaces as $namespace) {
+      if (class_exists($namespaced_class = $namespace . '\\' . $class)) {
+        return new $namespaced_class();
+      }
+    }
+    return new crud($class);
   }
   public function multiple($arguments) {
     $results = array();

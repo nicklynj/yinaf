@@ -1,8 +1,12 @@
 <?php
 
+namespace yinaf;
+
 abstract class configuration {
   
   public static $debug = false;
+  
+  public static $php_include_path = 'php';
   
   public static $database_username = 'user';
   public static $database_password = 'password';

@@ -1,5 +1,7 @@
 <?php
 
+namespace yinaf;
+
 class request_json extends request {
   
   public function __construct($request) {

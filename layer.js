@@ -141,8 +141,8 @@ layer.prototype.render_current = function(opt_cancel) {
 
 
 layer.prototype.layer_propagate_cache_ = function(layers) {
-  for (var i = 0; layer.layers[i]; ++i) {
-    this.cache_propagate(layer.layers[i].cache, this.cache);
+  for (var i = 0; layers[i]; ++i) {
+    this.cache_propagate(layers[i].cache, this.cache);
   }
 };
 

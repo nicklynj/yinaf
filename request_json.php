@@ -42,11 +42,22 @@ class request_json extends request {
             'file' => $e->getFile(),
             'line' => $e->getLine(),
           ) + (configuration::$debug ? array(
-            'trace' => $e->getTrace(),
+            'trace' => $this->clean_trace($e->getTrace()),
           ) : array()),
         )));
       }
     }
+  }
+  
+  private function clean_trace($trace) {
+    if (is_resource($trace)) {
+      return (string)$trace . ' ('.get_resource_type($trace).')';
+    } else if (is_array($trace)) {
+      foreach ($trace as $key => &$value) {
+        $trace[$key] = $this->clean_trace($value);
+      }
+    }
+    return $trace;
   }
   
   public function error_handler($errno, $errstr, $errfile, $errline) {

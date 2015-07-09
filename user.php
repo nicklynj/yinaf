@@ -66,12 +66,15 @@ class user extends api {
           'deleted' => 0,
         ))) and
         ($this->database->timestampdiff($session['created_at']) < configuration::$session_max_age) and
-        ($this->database->timestampdiff(max($session['used_at'], $session['created_at'])) < configuration::$session_expires)
+        (($age = $this->database->timestampdiff(max($session['used_at'], $session['created_at']))) < configuration::$session_expires)
       ) {
-        return $this->database->update('session', array(
-          'used_at' => $this->database->now(),
-          'used_by' => $this->inet_aton($_SERVER['REMOTE_ADDR']),
-        ) + $session);
+        if ($age > 3600) {
+          $session = $this->database->update('session', array(
+            'used_at' => $this->database->now(),
+            'used_by' => $this->inet_aton($_SERVER['REMOTE_ADDR']),
+          ) + $session);
+        }
+        return $session;
       }  
     } else if (configuration::$user_use_requested_user_id) {
       return array(

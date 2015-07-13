@@ -70,7 +70,7 @@ cache.prototype.cache_read_helper_ = function(matches, mismatches, cache, table,
         for (var column in matches[id]) {
           if (column in cache[table][id]) {
             var match = false;
-            for (var i = 0; matches[id][column][i]; ++i) {
+            for (var i = 0; i in matches[id][column]; ++i) {
               if (matches[id][column][i] == cache[table][id][column]) {
                 match = true;
               }

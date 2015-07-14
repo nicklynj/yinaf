@@ -33,7 +33,7 @@ class request_json extends request {
         ));
         api::commit_transaction();
         die($result);
-      } catch (Exception $e) {
+      } catch (\Exception $e) {
         die(json_encode(array(
           'success' => false,
           'result' => array(
@@ -50,7 +50,10 @@ class request_json extends request {
   }
   
   private function clean_trace($trace) {
-    if (is_resource($trace)) {
+    if (
+      (is_resource($trace)) or
+      (!is_string($trace) and (substr(print_r($trace, true), 0, 8) === 'Resource'))
+    ) {
       return (string)$trace . ' ('.get_resource_type($trace).')';
     } else if (is_array($trace)) {
       foreach ($trace as $key => &$value) {

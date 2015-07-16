@@ -61,8 +61,6 @@ class api {
     if (strpos($class, '\\') !== false) {
       $namespaces[] = '';
     }
-    $namespaces[] = 'yinaf';
-    $namespaces[] = configuration::$php_include_path;
     $class_name = explode('\\', get_class($this));
     while ($class_name) {
       array_pop($class_name);
@@ -70,6 +68,8 @@ class api {
         $namespaces[] = implode('\\', $class_name);
       }
     }
+    $namespaces[] = configuration::$php_include_path;
+    $namespaces[] = 'yinaf';
     foreach ($namespaces as $namespace) {
       if (class_exists($namespaced_class = $namespace . '\\' . $class)) {
         return new $namespaced_class();

@@ -17,22 +17,22 @@ class request_json extends request {
       set_error_handler(array($this, 'error_handler'));
       register_shutdown_function(array($this, 'shutdown_function'));
       try {
-        $result = json_encode(array(
+        $response = json_encode(array(
           'success' => true,
           'result' => $this->handle(
             $request['class'], 
             $request['function'], 
             json_decode($request['arguments'], true)
           ),
-        )+ (configuration::$debug ?
-          array(
-            'queries' => $this->database->get_queries(),
-            'calls' => api::get_calls(),
-          ) : 
-          array()
         ));
         api::commit_transaction();
-        die($result);
+        if (configuration::$debug) {
+          $response = json_encode(json_decode($response, true) + array(
+            'queries' => $this->database->get_queries(),
+            'calls' => api::get_calls(),
+          ));
+        }
+        die($response);
       } catch (\Exception $e) {
         die(json_encode(array(
           'success' => false,

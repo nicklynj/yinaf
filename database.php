@@ -4,7 +4,7 @@ namespace yinaf;
 
 class database extends \mysqli {
 
-  private $queries;
+  private $queries = array();
   private $transaction_started;
   private $old_rows;
   private $new_rows;
@@ -15,7 +15,6 @@ class database extends \mysqli {
   private $described;
 
   private function initialize() {
-    $this->queries = array();
     $this->transaction_started = false;
     $this->old_rows = array();
     $this->new_rows = array();
@@ -28,7 +27,7 @@ class database extends \mysqli {
   private function start_transaction() {
     if (!$this->transaction_started) {
       $this->initialize();
-      parent::query('start transaction');
+      $this->query('start transaction');
       $this->transaction_started = true;
     }
   }
@@ -211,51 +210,76 @@ class database extends \mysqli {
     }
     return $attributes;
   }
-  private function audit() {
+  private function audit_get_diffs($prune_rows) {
+    $audits = array('new' => array(), 'old' => array());
     foreach ($this->old_rows as $table => &$rows) {
       if (isset($this->new_rows[$table])) {
         foreach ($rows as $id => &$row) {
-          if (isset($this->new_rows[$table][$id])) {
-            $this->new_rows[$table][$id] = array_diff_assoc(
-              $this->new_rows[$table][$id],
-              $row
-            );
-            $row = array_intersect_key(
-              $row,
-              $this->new_rows[$table][$id]
-            );
-          } else {
-            unset($this->old_rows[$table][$id]);
+          if (
+            (isset($this->new_rows[$table][$id])) and
+            ($diff = array_diff_assoc($this->new_rows[$table][$id], $row))
+          ) {
+            if ($prune_rows) {
+              $audits['old'][$table][$id] = array_intersect_key(
+                $row, 
+                $audits['new'][$table][$id] = $diff
+              );
+            } else {
+              $audits['old'][$table][$id] = $row;
+              $audits['new'][$table][$id] = $this->new_rows[$table][$id];
+            }
           }
-          unset($row);
         }
-      } else {
-        unset($this->old_rows[$table]);
       }
-      unset($rows);
     }
-    $user_id = request::get_request()->get_requested('user_id');
-    $creates = array();
-    $updates = array();
     foreach ($this->new_rows as $table => &$rows) {
       foreach ($rows as $id => &$row) {
         if (
-          (isset($this->old_rows[$table])) and
-          (isset($this->old_rows[$table][$id]))
+          (!isset($this->old_rows[$table])) or
+          (!isset($this->old_rows[$table][$id]))
         ) {
-          foreach ($row as $column => &$value) {
-            if (is_string($value) or ($value === null)) {
+          $audits['new'][$table][$id] = $row;
+        }
+      }
+    }
+    return $audits;
+  }
+  private function audit_class() {
+    call_user_func_array(
+      array(new configuration::$database_audit_class, configuration::$database_audit_function),
+      $this->audit_get_diffs(false)
+    );
+  }
+  private function audit() {
+    $audits = $this->audit_get_diffs(true);
+    // var_dump($audits);
+    $creates = array();
+    $updates = array();
+    $user_id = request::get_request()->get_requested('user_id');
+    foreach ($audits['new'] as $table => &$rows) {
+      if (isset($audits['old'][$table])) {
+        foreach ($rows as $id => &$row) {
+          if (isset($audits['old'][$table][$id])) {
+            foreach ($row as $column => &$value) {
               $updates[] = array(
                 'table' => $table,
                 'id' => $id,
                 'column' => $column,
-                'old_value' => $this->old_rows[$table][$id][$column],
+                'old_value' => $audits['old'][$table][$id][$column],
                 'new_value' => $value,
                 'user_id' => $user_id,
               );
             }
           }
-        } else {
+        }
+      }
+    }
+    foreach ($audits['new'] as $table => &$rows) {
+      foreach ($rows as $id => &$row) {
+        if (
+          (!isset($audits['old'][$table])) or
+          (!isset($audits['old'][$table][$id]))
+        ) {
           $creates[] = array(
             'table' => $table,
             'id' => $id,
@@ -406,7 +430,9 @@ class database extends \mysqli {
   }
 
   public function query($str) {
-    $this->start_transaction();
+    if ($str !== 'start transaction') {
+      $this->start_transaction();
+    }
     if (configuration::$debug) {
       $start = microtime(true);
       $result = parent::query($str);
@@ -537,6 +563,9 @@ class database extends \mysqli {
   }
   public function commit_transaction() {
     if ($this->transaction_started) {
+      if (configuration::$database_audit_class) {
+        $this->audit_class();
+      }
       if (configuration::$database_auditing) {
         $this->audit();
       }

@@ -14,6 +14,9 @@ abstract class configuration {
   public static $database_name = 'example';
   public static $database_auditing = false;
   
+  public static $database_audit_class = null;
+  public static $database_audit_function = null;
+  
   public static $database_auto_increment_increment = 1;
   
   public static $database_root_user = true;

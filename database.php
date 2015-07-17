@@ -102,6 +102,8 @@ class database extends \mysqli {
         );
       } else if ($id_or_ids_or_attributes === null) {
         $attributes = array();
+      } else if (is_array($id_or_ids_or_attributes) and (!$id_or_ids_or_attributes)) { /* if($table === 'type_of_service') var_dump(__LINE__); */
+        return null;
       } else {
         $attributes = $id_or_ids_or_attributes;
       }

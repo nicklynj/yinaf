@@ -17,20 +17,20 @@ class crud extends authenticated {
           request::get_request()->get_requested(configuration::$database_root_column)
       );
     } else {
-      return array();
+      return null;
     }
   }
   public function create($attributes = array()) {
     return $this->database->create(
       $this->class_name,
-      $this->get_root() + $attributes
+      (($root = $this->get_root()) ? $root : array()) + ($attributes ? $attributes : array())
     );
   }
-  public function read($attributes = array()) {
+  public function read($attributes = null) {
     $results = $this->database->read(
       $this->class_name,
       $attributes,
-      ($this->dictionary ? array() : $this->get_root())
+      ($this->dictionary ? null : $this->get_root())
     );
     foreach ($results as $id => &$row) {
       if ($row['deleted']) {
@@ -52,11 +52,11 @@ class crud extends authenticated {
       'deleted' => 1,
     ));
   }
-  public function get($id_or_attributes) {
+  public function get($id_or_attributes = null) {
     return $this->database->get(
       $this->class_name,
       $id_or_attributes,
-      ($this->dictionary ? array() : $this->get_root())
+      ($this->dictionary ? null : $this->get_root())
     );
   }
 

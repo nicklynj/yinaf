@@ -64,8 +64,8 @@ class crud extends authenticated {
     
     $queries = array();
     
-    $queries[] = 'select * from `'.$this->class_name.'` where code like "%'.$this->database->real_escape_string($str).'%"';
-    $queries[] = 'select * from `'.$this->class_name.'` where name like "%'.$this->database->real_escape_string($str).'%"';
+    $queries[] = 'select * from `'.$this->class_name.'` where code like "%'.$this->database->real_escape_string($str).'%" and deleted = 0';
+    $queries[] = 'select * from `'.$this->class_name.'` where name like "%'.$this->database->real_escape_string($str).'%" and deleted = 0';
     
     $results = array();
     

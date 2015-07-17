@@ -43,6 +43,8 @@ class request_json extends request {
             'line' => $e->getLine(),
           ) + (configuration::$debug ? array(
             'trace' => $this->clean_trace($e->getTrace()),
+            'queries' => $this->database->get_queries(),
+            'calls' => api::get_calls(),
           ) : array()),
         )));
       }

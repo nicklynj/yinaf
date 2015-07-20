@@ -33,6 +33,9 @@ class crud extends authenticated {
       ($this->dictionary ? null : $this->get_root())
     );
     foreach ($results as $id => &$row) {
+      if (!isset($row['deleted'])) {
+        throw new Exception($this->class_name);
+      }
       if ($row['deleted']) {
         unset($results[$id]);
       }

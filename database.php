@@ -102,7 +102,10 @@ class database extends \mysqli {
         );
       } else if ($id_or_ids_or_attributes === null) {
         $attributes = array();
-      } else if (is_array($id_or_ids_or_attributes) and (!$id_or_ids_or_attributes)) { /* if($table === 'type_of_service') var_dump(__LINE__); */
+      } else if (
+        is_array($id_or_ids_or_attributes) and 
+        (!$id_or_ids_or_attributes)
+      ) {
         return null;
       } else {
         $attributes = $id_or_ids_or_attributes;
@@ -215,32 +218,36 @@ class database extends \mysqli {
   private function audit_get_diffs($prune_rows) {
     $audits = array('new' => array(), 'old' => array());
     foreach ($this->old_rows as $table => &$rows) {
-      if (isset($this->new_rows[$table])) {
-        foreach ($rows as $id => &$row) {
-          if (
-            (isset($this->new_rows[$table][$id])) and
-            ($diff = array_diff_assoc($this->new_rows[$table][$id], $row))
-          ) {
-            if ($prune_rows) {
-              $audits['old'][$table][$id] = array_intersect_key(
-                $row, 
-                $audits['new'][$table][$id] = $diff
-              );
-            } else {
-              $audits['old'][$table][$id] = $row;
-              $audits['new'][$table][$id] = $this->new_rows[$table][$id];
+      if ($table !== 'yinaf') {
+        if (isset($this->new_rows[$table])) {
+          foreach ($rows as $id => &$row) {
+            if (
+              (isset($this->new_rows[$table][$id])) and
+              ($diff = array_diff_assoc($this->new_rows[$table][$id], $row))
+            ) {
+              if ($prune_rows) {
+                $audits['old'][$table][$id] = array_intersect_key(
+                  $row, 
+                  $audits['new'][$table][$id] = $diff
+                );
+              } else {
+                $audits['old'][$table][$id] = $row;
+                $audits['new'][$table][$id] = $this->new_rows[$table][$id];
+              }
             }
           }
         }
       }
     }
     foreach ($this->new_rows as $table => &$rows) {
-      foreach ($rows as $id => &$row) {
-        if (
-          (!isset($this->old_rows[$table])) or
-          (!isset($this->old_rows[$table][$id]))
-        ) {
-          $audits['new'][$table][$id] = $row;
+      if ($table !== 'yinaf') {
+        foreach ($rows as $id => &$row) {
+          if (
+            (!isset($this->old_rows[$table])) or
+            (!isset($this->old_rows[$table][$id]))
+          ) {
+            $audits['new'][$table][$id] = $row;
+          }
         }
       }
     }
@@ -254,7 +261,6 @@ class database extends \mysqli {
   }
   private function audit() {
     $audits = $this->audit_get_diffs(true);
-    // var_dump($audits);
     $creates = array();
     $updates = array();
     $user_id = request::get_request()->get_requested('user_id');

@@ -371,11 +371,11 @@ cache.prototype.flush_collapse_updates = function(calls) {
       if (!(cls in map)) {
         map[cls] = {};
       }
-      if (calls[i][cls + '_id'] in map[cls]) {
-        rocket.extend(map[cls][calls[i][cls + '_id']], calls[i].arguments);
+      if (calls[i].arguments[cls + '_id'] in map[cls]) {
+        rocket.extend(map[cls][calls[i].arguments[cls + '_id']].arguments, calls[i].arguments);
         calls.splice(i--, 1);
       } else {
-        map[cls][calls[i][cls + '_id']] = calls[i];
+        map[cls][calls[i].arguments[cls + '_id']] = calls[i];
       }
     }
   }

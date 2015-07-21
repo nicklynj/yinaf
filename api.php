@@ -35,7 +35,10 @@ class api {
   protected function api($class, $function/* , $var_args */) {
     if (configuration::$debug) {
       $start = microtime(true);
-      $call = array();
+      $call = array(
+        'class' => $class,
+        'function' => $function,
+      );
       self::$calls[] = &$call;
       $calls_length = count(self::$calls);
     }
@@ -46,8 +49,6 @@ class api {
     if (configuration::$debug) {
       $time = round(microtime(true) - $start, 4);
       $call += array(
-        'class' => $class,
-        'function' => $function,
         'total_time' => $time,
         'own_time' => isset(self::$calls[$calls_length]) ?
           $time - array_sum(array_column(array_slice(self::$calls, $calls_length), 'own_time')) :

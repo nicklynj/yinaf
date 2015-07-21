@@ -69,8 +69,13 @@ class database extends \mysqli {
     } else {
       $column = $this->get_column_name($table, $column);
       if (
-        (strpos($column, 'json_') === 0) or
-        (strpos($column, 'compressed_json_') === 0)
+        (
+          ($table === 'audit_updated') and
+          (is_array($str))
+        ) or (
+          (strpos($column, 'json_') === 0) or
+          (strpos($column, 'compressed_json_') === 0)
+         )
       ) {
         $str = json_encode($str);
       }
@@ -215,6 +220,25 @@ class database extends \mysqli {
     }
     return $attributes;
   }
+  private function diff($new, $old) {
+    $diffs = array();
+    foreach ($new as $key => &$value) {
+      if (!array_key_exists($key, $old)) {
+        $diffs[$key] = $value;
+      } else {
+        if (is_array($value) or is_array($old[$key])) {
+          if (json_encode($old[$key]) !== json_encode($value)) {
+            $diffs[$key] = $value;
+          }
+        } else {
+          if (strval($old[$key]) !== strval($value)) {
+            $diffs[$key] = $value;
+          }
+        }
+      }
+    }
+    return $diffs;
+  }
   private function audit_get_diffs($prune_rows) {
     $audits = array('new' => array(), 'old' => array());
     foreach ($this->old_rows as $table => &$rows) {
@@ -223,7 +247,7 @@ class database extends \mysqli {
           foreach ($rows as $id => &$row) {
             if (
               (isset($this->new_rows[$table][$id])) and
-              ($diff = array_diff_assoc($this->new_rows[$table][$id], $row))
+              ($diff = $this->diff($this->new_rows[$table][$id], $row))
             ) {
               if ($prune_rows) {
                 $audits['old'][$table][$id] = array_intersect_key(
@@ -361,29 +385,35 @@ class database extends \mysqli {
     $result = $this->query('select * from ' . $this->word($table) . ' where ' . $where_clause);
     $results = array();
     while ($row = $result->fetch_assoc()) {
-      $result_row = array();
       foreach ($row as $column => &$value) {
         if (strpos($column, 'compressed_') === 0) {
           if ($value) {
             $value = gzuncompress(substr($value, 4));
           }
+          unset($row[$column]);
           $column = substr($column, 11);
         }
         if (strpos($column, 'json_') === 0) {
           if ($value) {
             $value = json_decode($value, true);
           }
+          unset($row[$column]);
           $column = substr($column, 5);
         }
-        $result_row[$column] = $value;
+        $row[$column] = &$value;
       }
-      if (!isset($this->old_rows[$table])) {
-        $this->old_rows[$table] = array();
+      if (
+        (!isset($this->new_rows[$table])) or
+        (!isset($this->new_rows[$table][$row[$table . '_id']]))
+      ) {
+        if (!isset($this->old_rows[$table])) {
+          $this->old_rows[$table] = array();
+        }
+        if (!isset($this->old_rows[$table][$row[$table . '_id']])) {
+          $this->old_rows[$table][$row[$table . '_id']] = $row;
+        }
       }
-      if (!isset($this->old_rows[$table][$row[$table . '_id']])) {
-        $this->old_rows[$table][$row[$table . '_id']] = $result_row;
-      }
-      $results[$row[$table . '_id']] = $result_row;
+      $results[$row[$table . '_id']] = $row;
     }
     return $results;
   }

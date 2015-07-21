@@ -362,16 +362,18 @@ class database extends \mysqli {
     $results = array();
     while ($row = $result->fetch_assoc()) {
       $result_row = array();
-      foreach ($row as $column => $value) {
-        if ($value) {
-          if (strpos($column, 'compressed_') === 0) {
+      foreach ($row as $column => &$value) {
+        if (strpos($column, 'compressed_') === 0) {
+          if ($value) {
             $value = gzuncompress(substr($value, 4));
-            $column = substr($column, 11);
           }
-          if (strpos($column, 'json_') === 0) {
+          $column = substr($column, 11);
+        }
+        if (strpos($column, 'json_') === 0) {
+          if ($value) {
             $value = json_decode($value, true);
-            $column = substr($column, 5);
           }
+          $column = substr($column, 5);
         }
         $result_row[$column] = $value;
       }

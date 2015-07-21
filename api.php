@@ -7,6 +7,7 @@ class api {
   protected $database;
   protected $class_name;
   private static $calls = array();
+  private static $call_stack = array();
   public function __construct() {
     if (!isset(self::$database_instance)) {
       self::$database_instance = new database(
@@ -29,7 +30,21 @@ class api {
   }
   public static function commit_transaction() {
     if (isset(self::$database_instance)) {
+      if (configuration::$debug) {
+        $start = microtime(true);
+        $call = array(
+          'class' => 'api',
+          'function' => 'commit_transaction',
+        );
+        self::$calls[] = &$call;
+      }
       self::$database_instance->commit_transaction();
+      if (configuration::$debug) {
+        $call += array(
+          'total_time' => round(microtime(true) - $start, 4),
+          'own_time' => 0,
+        );
+      }
     }
   }
   protected function api($class, $function/* , $var_args */) {
@@ -39,23 +54,43 @@ class api {
         'class' => $class,
         'function' => $function,
       );
-      self::$calls[] = &$call;
-      $calls_length = count(self::$calls);
+      if ($len = count(self::$call_stack)) {
+        self::$call_stack[$len - 1]['calls'][] = &$call;
+      } else {
+        self::$calls[] = &$call;
+      }
+      self::$call_stack[] = &$call;
+      $queries = count($this->database->get_queries());
     }
     $result = call_user_func_array(
       array($this->api_get_object($class), $function),
       array_slice(func_get_args(), 2)
     );
     if (configuration::$debug) {
-      $time = round(microtime(true) - $start, 4);
+      array_pop(self::$call_stack);
+      $time = microtime(true) - $start;
       $call += array(
-        'total_time' => $time,
-        'own_time' => isset(self::$calls[$calls_length]) ?
-          $time - array_sum(array_column(array_slice(self::$calls, $calls_length), 'own_time')) :
-          $time
+        'time' => round($time, 4),
+        'own_time' => round($time - $this->get_time($call), 4),
+        'queries' => array_slice($this->database->get_queries(), $queries),
+        'own_queries' => array_slice($this->database->get_queries(), $queries + $this->get_queries($call)),
       );
     }
     return $result;
+  }
+  private function get_queries(&$call) {
+    $queries = 0;
+    for ($i = 0; isset($call['calls'][$i]); ++$i) {
+      $queries += count($call['calls'][$i]['queries']) + $this->get_time($call['calls'][$i]);
+    }
+    return $queries;
+  }
+  private function get_time(&$call) {
+    $time = 0;
+    for ($i = 0; isset($call['calls'][$i]); ++$i) {
+      $time += $call['calls'][$i]['own_time'] + $this->get_time($call['calls'][$i]);
+    }
+    return $time;
   }
   private function api_get_object($class) {
     $namespaces = array();

@@ -289,34 +289,38 @@ class database extends \mysqli {
     $updates = array();
     $user_id = request::get_request()->get_requested('user_id');
     foreach ($audits['new'] as $table => &$rows) {
-      if (isset($audits['old'][$table])) {
-        foreach ($rows as $id => &$row) {
-          if (isset($audits['old'][$table][$id])) {
-            foreach ($row as $column => &$value) {
-              $updates[] = array(
-                'table' => $table,
-                'id' => $id,
-                'column' => $column,
-                'old_value' => $audits['old'][$table][$id][$column],
-                'new_value' => $value,
-                'user_id' => $user_id,
-              );
+      if (!in_array($table, configuration::$database_auditing_skip_tables)) {
+        if (isset($audits['old'][$table])) {
+          foreach ($rows as $id => &$row) {
+            if (isset($audits['old'][$table][$id])) {
+              foreach ($row as $column => &$value) {
+                $updates[] = array(
+                  'table' => $table,
+                  'id' => $id,
+                  'column' => $column,
+                  'old_value' => $audits['old'][$table][$id][$column],
+                  'new_value' => $value,
+                  'user_id' => $user_id,
+                );
+              }
             }
           }
         }
       }
     }
     foreach ($audits['new'] as $table => &$rows) {
-      foreach ($rows as $id => &$row) {
-        if (
-          (!isset($audits['old'][$table])) or
-          (!isset($audits['old'][$table][$id]))
-        ) {
-          $creates[] = array(
-            'table' => $table,
-            'id' => $id,
-            'user_id' => $user_id,
-          );
+      if (!in_array($table, configuration::$database_auditing_skip_tables)) {
+        foreach ($rows as $id => &$row) {
+          if (
+            (!isset($audits['old'][$table])) or
+            (!isset($audits['old'][$table][$id]))
+          ) {
+            $creates[] = array(
+              'table' => $table,
+              'id' => $id,
+              'user_id' => $user_id,
+            );
+          }
         }
       }
     }
@@ -430,7 +434,7 @@ class database extends \mysqli {
     foreach ($attributes_array as &$attributes) {
       $id = $attributes[$table . '_id'];
       unset($attributes[$table . '_id']);
-      if ($attributes) {
+      if ($attributes = $this->diff($this->stringify($table, $attributes), $rows[$id])) {
         $this->query('update ' . $this->word($table) . ' set ' . implode(',',
           array_map(
             array($this, 'column_equals_value'),
@@ -446,13 +450,13 @@ class database extends \mysqli {
           (!preg_match('/matched\: (\d+)/', $this->info, $match)) or
           (!$match[1])
         ) {
-          throw new Exception('match not found on table:"' . $table . '", id:"' . $id . '"');
+          throw new Exception('id: "' . $id . '" not found in table: "' . $table . '"');
         }
+        if (!isset($this->new_rows[$table])) {
+          $this->new_rows[$table] = array();
+        }
+        $this->new_rows[$table][$id] = $rows[$id] = $attributes + $rows[$id];
       }
-      if (!isset($this->new_rows[$table])) {
-        $this->new_rows[$table] = array();
-      }
-      $this->new_rows[$table][$id] = $rows[$id] = $this->stringify($table, $attributes) + $rows[$id];
     }
     if ($all_numeric_keys) {
       return $rows;

@@ -86,7 +86,7 @@ cache.prototype.cache_read_helper_ = function(matches, mismatches, cache, table,
         for (var column in matches[id]) {
           if (column in cache[table][id]) {
             var match = false;
-            for (var i = 0; matches[id][column][i]; ++i) {
+            for (var i = 0; i in matches[id][column]; ++i) {
               if (matches[id][column][i] == cache[table][id][column]) {
                 match = true;
               }
@@ -387,11 +387,11 @@ cache.prototype.flush_collapse_updates = function(calls) {
       if (!(cls in map)) {
         map[cls] = {};
       }
-      if (calls[i][cls + '_id'] in map[cls]) {
-        rocket.extend(map[cls][calls[i][cls + '_id']], calls[i].arguments);
+      if (calls[i].arguments[cls + '_id'] in map[cls]) {
+        rocket.extend(map[cls][calls[i].arguments[cls + '_id']].arguments, calls[i].arguments);
         calls.splice(i--, 1);
       } else {
-        map[cls][calls[i][cls + '_id']] = calls[i];
+        map[cls][calls[i].arguments[cls + '_id']] = calls[i];
       }
     }
   }
@@ -572,8 +572,8 @@ layer.prototype.render_current = function(opt_cancel) {
 
 
 layer.prototype.layer_propagate_cache_ = function(layers) {
-  for (var i = 0; layer.layers[i]; ++i) {
-    this.cache_propagate(layer.layers[i].cache, this.cache);
+  for (var i = 0; layers[i]; ++i) {
+    this.cache_propagate(layers[i].cache, this.cache);
   }
 };
 
@@ -611,6 +611,12 @@ rocket.inherits(component, layer);
 
 
 component.prototype.decorate = function() {};
+
+
+component.prototype.addEventListener = function(/* var_args */) {
+  rocket.EventTarget.prototype.addEventListener.apply(this, arguments);
+  return this;
+};
 
 
 

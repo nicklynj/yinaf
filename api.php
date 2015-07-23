@@ -8,6 +8,7 @@ class api {
   protected $class_name;
   private static $calls = array();
   private static $call_stack = array();
+  private static $profiles = array();
   public function __construct() {
     if (!isset(self::$database_instance)) {
       self::$database_instance = new database(
@@ -27,6 +28,32 @@ class api {
   }
   public static function get_calls() {
     return self::$calls;
+  }
+  public static function get_profiles() {
+    $profiles = array();
+    foreach (self::$profiles as $class => &$functions) {
+      $total_own_time = $total_time = $total_cnt = 0;
+      foreach ($functions as $function => $times) {
+        $profiles[$class][$function] = array(
+          'calls' => ($cnt = count($times)),
+          'time' => round($time = array_sum(array_column($times, 'time')), 4),
+          'own_time' => round($own_time = array_sum(array_column($times, 'own_time')), 4),
+          'avg_time' => round($time / $cnt, 4),
+          'avg_own_time' => round($own_time / $cnt, 4),
+        );
+        $total_cnt += $cnt;
+        $total_time += $time;
+        $total_own_time += $own_time;
+      }
+      $profiles[$class] += array(
+        'calls' => $total_cnt,
+        'time' => round($total_time, 4),
+        'own_time' => round($total_own_time, 4),
+        'avg_time' => round($total_time / $total_cnt, 4),
+        'avg_own_time' => round($total_own_time / $total_cnt, 4),
+      );
+    }
+    return $profiles;
   }
   public static function commit_transaction() {
     if (isset(self::$database_instance)) {
@@ -68,13 +95,15 @@ class api {
     );
     if (configuration::$debug) {
       array_pop(self::$call_stack);
-      $time = microtime(true) - $start;
-      $call += array(
-        'time' => round($time, 4),
-        'own_time' => round($time - $this->get_time($call), 4),
+      $times = array(
+        'time' => round($time = microtime(true) - $start, 4),
+        'own_time' => $own_time = round($time - $this->get_time($call), 4),
+      );
+      $call += $times + array(
         'queries' => array_slice($this->database->get_queries(), $queries),
         'own_queries' => array_slice($this->database->get_queries(), $queries + $this->get_queries($call)),
       );
+      self::$profiles[$class][$function][] = $times;
     }
     return $result;
   }

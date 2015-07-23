@@ -30,6 +30,7 @@ class request_json extends request {
           $response = json_encode(json_decode($response, true) + array(
             'queries' => $this->database->get_queries(),
             'calls' => api::get_calls(),
+            'profiles' => api::get_profiles(),
           ));
         }
         die($response);
@@ -45,6 +46,7 @@ class request_json extends request {
             'trace' => $this->clean_trace($e->getTrace()),
             'queries' => $this->database->get_queries(),
             'calls' => api::get_calls(),
+            'profiles' => api::get_profiles(),
           ) : array()),
         )));
       }

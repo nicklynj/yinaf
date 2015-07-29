@@ -364,9 +364,8 @@ class database extends \mysqli {
       if (!isset($this->new_rows[$table])) {
         $this->new_rows[$table] = array();
       }
-      $last_insert_id = $this->insert_id;
       for ($i = 0; isset($attributes_array_index[$i]); ++$i) {
-        $id = $this->insert_id - (count($attributes_array_index) - $i - 1) * configuration::$database_auto_increment_increment;
+        $id = $this->insert_id + $i * configuration::$database_auto_increment_increment;
         $this->new_rows[$table][$id] = $rows[$id] = $this->stringify($table, 
           $attributes_array_index[$i] + 
           array($table . '_id' => $id) +

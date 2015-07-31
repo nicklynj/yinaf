@@ -324,6 +324,8 @@ cache.prototype.flush_get_updates = function(calls, alias_to_table) {
 cache.prototype.flush_get_updates_from_negative_pointers = function(calls, alias_to_table, negative_pointers) {
   for (var i = 0; negative_pointers[i]; ++i) {
     var pointer = negative_pointers[i];
+    var alias_id;
+    var alias_value;
     if (!pointer.self) {
       var id;
       if (pointer.id > 0) {
@@ -334,7 +336,7 @@ cache.prototype.flush_get_updates_from_negative_pointers = function(calls, alias
             (negative_pointers[j].self) &&
             (negative_pointers[j].value === +pointer.id)
           ) {
-            id = '=' + negative_pointers[j].alias + '.' + pointer.table + '_id';
+            id = '=' + (alias_id = negative_pointers[j].alias) + '.' + pointer.table + '_id';
             break;
           }
         }
@@ -344,20 +346,28 @@ cache.prototype.flush_get_updates_from_negative_pointers = function(calls, alias
           (negative_pointers[j].self) &&
           (negative_pointers[j].value === pointer.value)
         ) {
-          var value = '=' + negative_pointers[j].alias + '.' + negative_pointers[j].table + '_id';
+          var value = '=' + (alias_value = negative_pointers[j].alias) + '.' + negative_pointers[j].table + '_id';
           break;
         }
       }
-      calls.push({
-        'alias': alias_to_table.length,
-        'class': pointer.table,
-        'function': 'update',
-        'arguments': rocket.extend(
-          rocket.object(pointer.table + '_id', id),
-          rocket.object(pointer.column, value)
-        )
-      });
-      alias_to_table.push(pointer.table);
+      if (
+        (typeof alias_id === 'number') &&
+        (typeof alias_value === 'number') &&
+        (alias_id > alias_value)
+      ) {
+        calls[alias_id].arguments[pointer.column] = value;
+      } else {
+        calls.push({
+          'alias': alias_to_table.length,
+          'class': pointer.table,
+          'function': 'update',
+          'arguments': rocket.extend(
+            rocket.object(pointer.table + '_id', id),
+            rocket.object(pointer.column, value)
+          )
+        });
+        alias_to_table.push(pointer.table);
+      }
     }
   }
 };

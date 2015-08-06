@@ -31,10 +31,6 @@ class database extends \mysqli {
       $this->transaction_started = true;
     }
   }
-  private function ends_with($haystack, $needle) {
-    return (($length = strlen($haystack) - strlen($needle)) >= 0) and
-      (strpos($haystack, $needle, $length) !== false);
-  }
   private function word_($str) {
     if (preg_match('/^[\d\w]+$/', $str)) {
       return '`' . $str . '`';
@@ -202,6 +198,12 @@ class database extends \mysqli {
         $value = $this->now();
       } else {
         $value = $column['Default'];
+      }
+      if (
+        (strpos($column['Field'], 'json_') === 0) or
+        (strpos($column['Field'], 'compressedd_json_') === 0)
+      ) {
+        $value = json_decode($value, true);
       }
       $row[str_replace(array('compressed_', 'json_'), '', $column['Field'])] = $value;
     }

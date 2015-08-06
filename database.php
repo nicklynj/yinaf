@@ -435,6 +435,9 @@ class database extends \mysqli {
     foreach ($attributes_array as &$attributes) {
       $id = $attributes[$table . '_id'];
       unset($attributes[$table . '_id']);
+      if (!isset($rows[$id])) {
+        throw new Exception('id: "' . $id . '" not found in table: "' . $table . '"');
+      }
       if ($attributes = $this->diff($this->stringify($table, $attributes), $rows[$id])) {
         $this->query('update ' . $this->word($table) . ' set ' . implode(',',
           array_map(
@@ -447,12 +450,6 @@ class database extends \mysqli {
           array($table . '_id' => $id),
           array_slice(func_get_args(), 2)
         )));
-        if (
-          (!preg_match('/matched\: (\d+)/', $this->info, $match)) or
-          (!$match[1])
-        ) {
-          throw new Exception('id: "' . $id . '" not found in table: "' . $table . '"');
-        }
         if (!isset($this->new_rows[$table])) {
           $this->new_rows[$table] = array();
         }

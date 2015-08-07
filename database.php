@@ -333,6 +333,14 @@ class database extends \mysqli {
       $this->create('audit_updated', $updates);
     }
   }
+  private function get_warnings_() {
+    $warnings = array();
+    $result = $this->query('show warnings');
+    while ($row = $result->fetch_assoc()) {
+      $warnings[] = $row['Level'] . ' #' . $row['Code'] . ' - ' . $row['Message'];
+    }
+    return implode(', ', $warnings);
+  }
   
   public function __destruct() {
     $this->commit_transaction();
@@ -486,12 +494,18 @@ class database extends \mysqli {
         'affected_rows' => $this->affected_rows,
       );
       if ($result) {
+        if ($this->warning_count) {
+          throw new Exception($this->get_warnings_());
+        }
         return $result;
       } else {
         throw new Exception($this->error . ':' . $str);
       }
     } else {
       if ($result = parent::query($str)) {
+        if ($this->warning_count) {
+          throw new Exception($this->get_warnings_());
+        }
         return $result;
       } else {
         throw new Exception($this->error . ':' . $str);

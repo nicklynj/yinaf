@@ -165,8 +165,7 @@ cache.prototype.get = function(table, id_or_attributes) {
 cache.prototype.flush = function(callback) {
   this.flush_remove_unnecessary_updates();
   var negative_pointers = this.flush_remove_negative_pointers();
-  var unresolved_negative_pointers = [];
-  this.flush_move_unresolved_negative_pointer_rows_back(negative_pointers, unresolved_negative_pointers);
+  this.flush_move_unresolved_negative_pointer_rows_back(negative_pointers);
   var alias_to_table = [];
   var calls = [];
   this.flush_get_inserts(calls, alias_to_table, negative_pointers);
@@ -179,7 +178,7 @@ cache.prototype.flush = function(callback) {
   if (calls.length) {
     var self = this;
     api('api', 'multiple', calls, function(result) {
-      self.flush_handle_result(result, alias_to_table, negative_pointers, unresolved_negative_pointers);
+      self.flush_handle_result(result, alias_to_table, negative_pointers);
       callback.call(self);
     });
   } else {
@@ -237,7 +236,7 @@ cache.prototype.flush_remove_negative_pointers = function() {
 };
 
 
-cache.prototype.flush_move_unresolved_negative_pointer_rows_back = function(negative_pointers, unresolved_negative_pointers) {
+cache.prototype.flush_move_unresolved_negative_pointer_rows_back = function(negative_pointers) {
   for (var i = 0; negative_pointers[i]; ++i) {
     var pointer = negative_pointers[i];
     if (!pointer.self) {
@@ -252,24 +251,23 @@ cache.prototype.flush_move_unresolved_negative_pointer_rows_back = function(nega
         }
       }
       if (!match) {
-        this.flush_replace_negative_pointer(negative_pointers, pointer.table, pointer.id, unresolved_negative_pointers);
+        this.flush_replace_negative_pointer(negative_pointers, pointer.table, pointer.id);
         this.get_previous_layer().update(pointer.table, this.cache[pointer.table][pointer.id]);
         delete this.cache[pointer.table][pointer.id];
-        return this.flush_move_unresolved_negative_pointer_rows_back(negative_pointers, unresolved_negative_pointers);
+        return this.flush_move_unresolved_negative_pointer_rows_back(negative_pointers);
       }
     }
   }
 };
 
 
-cache.prototype.flush_replace_negative_pointer = function(negative_pointers, table, id, unresolved_negative_pointers) {
+cache.prototype.flush_replace_negative_pointer = function(negative_pointers, table, id) {
   for (var i = 0; negative_pointers[i]; ++i) {
     if (
       (negative_pointers[i].table === table) &&
       (negative_pointers[i].id === id)
     ) {
       this.cache[table][id][negative_pointers[i].column] = negative_pointers[i].value;
-      unresolved_negative_pointers.push(negative_pointers[i]);
       negative_pointers.splice(i--, 1);
     }
   }
@@ -392,7 +390,7 @@ cache.prototype.flush_collapse_updates = function(calls) {
 };
 
 
-cache.prototype.flush_handle_result = function(result, alias_to_table, negative_pointers, unresolved_negative_pointers) {
+cache.prototype.flush_handle_result = function(result, alias_to_table) {
   for (var alias in result) {
     if (!(alias_to_table[alias] in cache.cache)) {
       cache.cache[alias_to_table[alias]] = {};

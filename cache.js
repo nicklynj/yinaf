@@ -269,9 +269,9 @@ cache.prototype.flush_replace_negative_pointer = function(negative_pointers, tab
       (negative_pointers[i].id === id)
     ) {
       this.cache[table][id][negative_pointers[i].column] = negative_pointers[i].value;
+      unresolved_negative_pointers.push(negative_pointers[i]);
+      negative_pointers.splice(i--, 1);
     }
-    unresolved_negative_pointers.push(negative_pointers[i]);
-    negative_pointers.splice(i--, 1);
   }
 };
 

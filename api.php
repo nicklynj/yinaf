@@ -127,10 +127,12 @@ class api {
       $namespaces[] = '';
     }
     $class_name = explode('\\', get_class($this));
-    while ($class_name) {
-      array_pop($class_name);
-      if ($class_name) {
-        $namespaces[] = implode('\\', $class_name);
+    if ($class_name[0] !== 'yinaf') {
+      while ($class_name) {
+        array_pop($class_name);
+        if ($class_name) {
+          $namespaces[] = implode('\\', $class_name);
+        }
       }
     }
     $namespaces[] = configuration::$php_include_path;

@@ -397,36 +397,53 @@ class database extends \mysqli {
     }
     $result = $this->query('select * from ' . $this->word($table) . ' where ' . $where_clause);
     $results = array();
-    while ($row = $result->fetch_assoc()) {
+    if ($row = $result->fetch_assoc()) {
+      $contains_compressed_or_json = false;
       foreach ($row as $column => &$value) {
-        if (strpos($column, 'compressed_') === 0) {
-          if ($value) {
-            $value = gzuncompress(substr($value, 4));
-          }
-          unset($row[$column]);
-          $column = substr($column, 11);
-        }
-        if (strpos($column, 'json_') === 0) {
-          if ($value) {
-            $value = json_decode($value, true);
-          }
-          unset($row[$column]);
-          $column = substr($column, 5);
-        }
-        $row[$column] = &$value;
-      }
-      if (
-        (!isset($this->new_rows[$table])) or
-        (!isset($this->new_rows[$table][$row[$table . '_id']]))
-      ) {
-        if (!isset($this->old_rows[$table])) {
-          $this->old_rows[$table] = array();
-        }
-        if (!isset($this->old_rows[$table][$row[$table . '_id']])) {
-          $this->old_rows[$table][$row[$table . '_id']] = $row;
+        if (
+          (strpos($column, 'compressed_') === 0) or
+          (strpos($column, 'json_') === 0)
+        ) {
+          $contains_compressed_or_json = true;
+          break;
         }
       }
-      $results[$row[$table . '_id']] = $row;
+      $result->data_seek(0);
+      while ($row = $result->fetch_assoc()) {
+        if ($contains_compressed_or_json) {
+          foreach ($row as $column => &$value) {
+            if (strpos($column, 'compressed_') === 0) {
+              if ($value) {
+                $value = gzuncompress(substr($value, 4));
+              }
+              unset($row[$column]);
+              $column = substr($column, 11);
+            }
+            if (strpos($column, 'json_') === 0) {
+              if ($value) {
+                $value = json_decode($value, true);
+              }
+              unset($row[$column]);
+              $column = substr($column, 5);
+            }
+            $row[$column] = &$value;
+          }
+        }
+        if (
+          ($where_clause !== '1') and (
+            (!isset($this->new_rows[$table])) or
+            (!isset($this->new_rows[$table][$row[$table . '_id']]))
+          )
+        ) {
+          if (!isset($this->old_rows[$table])) {
+            $this->old_rows[$table] = array();
+          }
+          if (!isset($this->old_rows[$table][$row[$table . '_id']])) {
+            $this->old_rows[$table][$row[$table . '_id']] = $row;
+          }
+        }
+        $results[$row[$table . '_id']] = $row;
+      }
     }
     return $results;
   }

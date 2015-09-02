@@ -35,10 +35,13 @@ layer.prototype.get_layers = function() {
 
 
 layer.prototype.get_class_names_ = function() {
-  return this.constructor.prototype.class_names_ = this.class_names_ = this.class_names_ || this.get_class_name_recursive_({
-    'layer': layer,
-    'component': component
-  });
+  return this.constructor.prototype.class_names_ = this.class_names_ =
+      this.hasOwnProperty('class_names_') ?
+          this.class_names_ :
+          this.get_class_name_recursive_({
+            'layer': layer,
+            'component': component
+          });
 };
 
 

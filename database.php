@@ -289,13 +289,18 @@ class database extends \mysqli {
     $audits = $this->audit_get_diffs(true);
     $creates = array();
     $updates = array();
-    $user_id = request::get_request()->get_requested('user_id');
+    $user_id = null;
     foreach ($audits['new'] as $table => &$rows) {
       if (!in_array($table, configuration::$database_auditing_skip_tables)) {
         if (isset($audits['old'][$table])) {
           foreach ($rows as $id => &$row) {
             if (isset($audits['old'][$table][$id])) {
               foreach ($row as $column => &$value) {
+                if (!$user_id) {
+                  $user = new user();
+                  $session = $user->resume();
+                  $user_id = $session['user_id'];
+                }
                 $updates[] = array(
                   'table' => $table,
                   'id' => $id,
@@ -317,6 +322,11 @@ class database extends \mysqli {
             (!isset($audits['old'][$table])) or
             (!isset($audits['old'][$table][$id]))
           ) {
+            if (!$user_id) {
+              $user = new user();
+              $session = $user->resume();
+              $user_id = $session['user_id'];
+            }
             $creates[] = array(
               'table' => $table,
               'id' => $id,

@@ -40,7 +40,7 @@ class user extends api {
             'user_id' => $user['user_id'],
             'created_by' => $this->inet_aton($_SERVER['REMOTE_ADDR']),
             'key' => hash('sha512', $user['uuid'] . time() . mt_rand()),
-          ));
+          ) + array_intersect_key($arguments, array_flip(configuration::$user_additional_columns)));
         }
       } else {
         if (configuration::$user_track_failed_logins) {
@@ -85,29 +85,26 @@ class user extends api {
   public function resume() {
     if (!isset(self::$session)) {
       if ($session = $this->get_session()) {
-        $request = request::get_request();
-        if (configuration::$database_root_user) {
-          if ($session['user_id'] == $request->get_requested('user_id')) {
-            self::$session = $session;
-          }
-        } else if (configuration::$database_user_client) {
-          if (
-            ($session['user_id'] == $request->get_requested('user_id')) and
-            ($this->database->get('user_client', array(
-              'user_id' => $session['user_id'],
-              'client_id' => $request->get_requested('client_id'),
-              'deleted' => 0,
-            )))
-          ) {
-            $this->database->select_db(
-              configuration::$database_client_prefix . '_' . $request->get_requested('client_id')
-            );
-            self::$session = $session;
-          }
+        if (
+          (configuration::$database_root_user) or
+          (configuration::$database_user_client) and
+          (!($client_id = request::get_request()->get_requested('client_id'))) or
+          ($user = $this->database->get('user', $session['user_id'])) and
+          (in_array($client_id, $user['client_ids'])) and
+          ($this->database->select_db(
+            configuration::$database_client_prefix . '_' . $client_id
+          ))
+        ) {
+          self::$session = $session;
         }
       }
     }
     return self::$session;
+  }
+  public function get() {
+    if ($session = $this->resume()) {
+      return $this->database->get('user', $session['user_id']);
+    }
   }
   public function update_password($arguments) {
     if ($session = $this->resume()) {
@@ -121,14 +118,13 @@ class user extends api {
     }
   }
   public function create($arguments) {
-    $uuid = $this->database->uuid();
     if (
       (
         configuration::$user_anonymous_create or 
         $this->resume()
       ) and
       ($user = $this->database->create('user', array(
-        'uuid' => $uuid,
+        'uuid' => $uuid = $this->database->uuid(),
         'username' => $arguments['username'],
         'password' => hash('sha512', $uuid . $arguments['password']), 
       ) + array_intersect_key($arguments, array_flip(configuration::$user_additional_columns))))
@@ -142,9 +138,7 @@ class user extends api {
   }
   public function update($attributes) {
     if ($session = $this->resume()) {
-      foreach (configuration::$user_updatable_columns_black_list as $column) {
-        unset($attributes[$column]);
-      }
+      $attributes = array_diff_key($attributes, array_flip(configuration::$user_updatable_columns_black_list));
       if (configuration::$user_updatable_columns_white_list) {
         $attributes = array_intersect_key($attributes, array_flip(configuration::$user_updatable_columns_white_list));
       }

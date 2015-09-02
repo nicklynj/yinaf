@@ -14,7 +14,7 @@ class crud extends authenticated {
     if (configuration::$database_root_column) {
       return array(
         configuration::$database_root_column => 
-          request::get_request()->get_requested(configuration::$database_root_column)
+          $this->session[configuration::$database_root_column]
       );
     } else {
       return null;
@@ -62,43 +62,4 @@ class crud extends authenticated {
       ($this->dictionary ? null : $this->get_root())
     );
   }
-
-  public function search($str) { // [todo:remove this]
-    
-    $queries = array();
-    
-    $queries[] = 'select * from `'.$this->class_name.'` where code like "%'.$this->database->real_escape_string($str).'%" and deleted = 0';
-    $queries[] = 'select * from `'.$this->class_name.'` where name like "%'.$this->database->real_escape_string($str).'%" and deleted = 0';
-    
-    $results = array();
-    
-    foreach ($queries as $query) {
-      $result = $this->database->query($query . ' limit 100');
-      while ($row = $result->fetch_assoc()) {
-        foreach ($row as $key => &$value) {
-          if (strpos($key, 'json_') === 0) {
-            $row[substr($key, 5)] = json_decode($value);
-            unset($row[$key]);
-          }
-        }
-        $results[] = $row;
-      }
-      $results = array_values(array_intersect_key($results, array_unique(array_map('serialize', $results))));
-      if (count($results) >= 100) {
-        break;
-      }
-    }
-    
-    array_multisort(
-      array_column($results, 'code'),
-      SORT_ASC,
-      array_column($results, 'name'),
-      SORT_ASC,
-      $results
-    );
-    
-    return $results;
-    
-  }
-  
 }

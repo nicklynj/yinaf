@@ -431,7 +431,16 @@ class database extends \mysqli {
             }
             if (strpos($column, 'json_') === 0) {
               if ($value) {
-                $value = json_decode($value, true);
+                if (
+                  (!($value = json_decode($value, true))) and
+                  (in_array(json_last_error(), array(
+                    JSON_ERROR_SYNTAX,
+                    JSON_ERROR_CTRL_CHAR,
+                    JSON_ERROR_UTF8
+                  )))
+                ) {
+                  throw new Exception('JSON_ERROR in:"'.$table.'#'.$row[$table . '_id'].'.'.$column);
+                }
               }
               unset($row[$column]);
               $column = substr($column, 5);
@@ -589,7 +598,33 @@ class database extends \mysqli {
     ) {
       return $this->descriptions[$database_name][$table];
     } else {
-      foreach ($this->read('yinaf') as $row) {
+      if (configuration::$debug) {
+        try {
+          $rows = $this->read('yinaf');
+        } catch (Exception $e) {
+          if (
+            ($this->errno === 1146) and
+            ($this->sqlstate === '42S02')
+          ) {
+            $this->query('
+              CREATE TABLE `yinaf` (
+                `yinaf_id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+                `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                `table` varchar(255) NOT NULL,
+                `json_columns` varchar(65000) NOT NULL,
+                PRIMARY KEY (`yinaf_id`),
+                UNIQUE KEY `table` (`table`)
+              ) ENGINE=InnoDB
+            ');
+            $rows = $this->read('yinaf');
+          } else {
+            throw $e;
+          }
+        }
+      } else {
+        $rows = $this->read('yinaf');
+      }
+      foreach ($rows as $row) {
         $this->descriptions[$database_name][$row['table']] = $row;
       }
       if (isset($this->descriptions[$database_name][$table])) {

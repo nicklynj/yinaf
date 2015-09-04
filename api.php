@@ -158,13 +158,14 @@ class api {
     return $results;
   }
   private function replacer($arguments, $results) {
-    if (is_array($arguments)) {
-      foreach ($arguments as $key => &$value) {
-        if (
-          (is_string($value)) and
-          (substr($value, 0, 1) === '=')
-        ) {
-          $value = $this->get_replacement($value, $results);
+    if (is_string($arguments)) {
+      if (substr($arguments, 0, 1) === '=') {
+        return $this->get_replacement($arguments, $results);
+      }
+    } else {
+      if (is_array($arguments)) {
+        foreach ($arguments as $key => &$value) {
+          $value = $this->replacer($value, $results);
         }
       }
     }

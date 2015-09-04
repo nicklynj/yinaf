@@ -103,7 +103,10 @@ class user extends api {
   }
   public function get() {
     if ($session = $this->resume()) {
-      return $this->database->get('user', $session['user_id']);
+      return array_diff_key(
+        $this->database->get('user', $session['user_id']), 
+        array_flip(array('uuid', 'password'))
+      );
     }
   }
   public function update_password($arguments) {
@@ -137,7 +140,10 @@ class user extends api {
     }
   }
   public function update($attributes) {
-    if ($session = $this->resume()) {
+    if (
+      (configuration::$user_updatable) and
+      ($session = $this->resume())
+    ) {
       $attributes = array_diff_key($attributes, array_flip(configuration::$user_updatable_columns_black_list));
       if (configuration::$user_updatable_columns_white_list) {
         $attributes = array_intersect_key($attributes, array_flip(configuration::$user_updatable_columns_white_list));

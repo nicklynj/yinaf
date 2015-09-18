@@ -83,20 +83,27 @@ class user extends api {
     }
   }
   public function resume() {
-    if (!isset(self::$session)) {
-      if ($session = $this->get_session()) {
-        if (
-          (configuration::$database_root_user) or
-          (configuration::$database_user_client) and
-          (!($client_id = request::get_request()->get_requested('client_id'))) or
-          ($user = $this->database->get('user', $session['user_id'])) and
-          (in_array($client_id, $user['client_ids'])) and
-          ($this->database->select_db(
-            configuration::$database_client_prefix . '_' . $client_id
-          ))
-        ) {
-          self::$session = $session;
-        }
+    if (
+      (!isset(self::$session)) and
+      ($session = $this->get_session())
+    ) {
+      if (
+        (configuration::$database_root_user) or
+        (configuration::$database_user_client) and
+        (
+          (
+            (!($client_id = request::get_request()->get_requested('client_id')))
+          ) or
+          (
+            ($user = $this->database->get('user', $session['user_id'])) and
+            (in_array($client_id, $user['client_ids'])) and
+            ($this->database->select_db(
+              configuration::$database_client_prefix . '_' . $client_id
+            ))
+          )
+        )
+      ) {
+        self::$session = $session;
       }
     }
     return self::$session;
@@ -151,6 +158,18 @@ class user extends api {
       return $this->database->update('user', array(
         'user_id' => $session['user_id'],
       ) + $attributes);
+    }
+  }
+  public function update_client_id($client_id) {
+    if (
+      (configuration::$database_user_client) and
+      ($session = $this->resume()) and
+      ($user = $this->database->get('user', $session['user_id'])) and
+      (in_array($client_id, $user['client_ids']))
+    ) {
+      return $this->database->update('session', array(
+        'client_id' => $client_id,
+      ) + $session);
     }
   }
 }

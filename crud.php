@@ -26,15 +26,17 @@ class crud extends authenticated {
       (($root = $this->get_root()) ? $root : array()) + ($attributes ? $attributes : array())
     );
   }
-  public function read($attributes = null) {
+  public function read($attributes = null, $deleted = false) {
     $results = $this->database->read(
       $this->class_name,
       $attributes,
       ($this->dictionary ? null : $this->get_root())
     );
-    foreach ($results as $id => &$row) {
-      if ($row['deleted']) {
-        unset($results[$id]);
+    if (!$deleted) {
+      foreach ($results as $id => &$row) {
+        if ($row['deleted']) {
+          unset($results[$id]);
+        }
       }
     }
     return $results;

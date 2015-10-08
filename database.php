@@ -528,6 +528,7 @@ class database extends \mysqli {
         'num_rows' => isset($result->num_rows) ? $result->num_rows : null,
         'info' => $this->info,
         'affected_rows' => $this->affected_rows,
+        'insert_id' => $this->insert_id,
       );
       if ($result) {
         if ($this->warning_count) {

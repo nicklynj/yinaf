@@ -9,6 +9,9 @@ var api = function() {
 };
 
 
+api.prototype.client_id;
+
+
 api.prototype.url = 'yinaf/';
 
 
@@ -21,6 +24,10 @@ api.prototype.request = function(cls, fnct, opt_args, opt_success, opt_xhr) {
     'function': fnct,
     'arguments': rocket.JSON.stringify((opt_args === undefined) ? null : opt_args)
   };
+  
+  if (this.client_id) {
+    xhr.data.client_id = this.client_id;
+  }
 
   xhr.open('POST', this.url);
   

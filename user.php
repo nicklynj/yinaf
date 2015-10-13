@@ -109,7 +109,10 @@ class user extends api {
     return self::$session;
   }
   public function get() {
-    if ($session = $this->resume()) {
+    if (
+      ($session = $this->resume()) and
+      ($this->database->select_db(configuration::$database_name))
+    ) {
       return array_diff_key(
         $this->database->get('user', $session['user_id']), 
         array_flip(array('uuid', 'password'))
@@ -117,7 +120,10 @@ class user extends api {
     }
   }
   public function update_password($arguments) {
-    if ($session = $this->resume()) {
+    if (
+      ($session = $this->resume()) and
+      ($this->database->select_db(configuration::$database_name))
+    ) {
       $user = $this->database->get('user', $session['user_id']);
       if ($this->verify_password($user, $arguments['old_password'])) {
         return $this->database->update('user', array(
@@ -133,6 +139,7 @@ class user extends api {
         configuration::$user_anonymous_create or 
         $this->resume()
       ) and
+      ($this->database->select_db(configuration::$database_name)) and
       ($user = $this->database->create('user', array(
         'uuid' => $uuid = $this->database->uuid(),
         'username' => $arguments['username'],
@@ -149,7 +156,8 @@ class user extends api {
   public function update($attributes) {
     if (
       (configuration::$user_updatable) and
-      ($session = $this->resume())
+      ($session = $this->resume()) and
+      ($this->database->select_db(configuration::$database_name))
     ) {
       $attributes = array_diff_key($attributes, array_flip(configuration::$user_updatable_columns_black_list));
       if (configuration::$user_updatable_columns_white_list) {
@@ -164,6 +172,7 @@ class user extends api {
     if (
       (configuration::$database_user_client) and
       ($session = $this->resume()) and
+      ($this->database->select_db(configuration::$database_name)) and
       ($user = $this->database->get('user', $session['user_id'])) and
       (in_array($client_id, $user['client_ids']))
     ) {

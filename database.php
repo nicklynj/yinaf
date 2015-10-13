@@ -650,7 +650,11 @@ class database extends \mysqli {
     }
   }
   public function select_db($database_name) {
-    return parent::select_db($this->database_name = $database_name);
+    if ($database_name !== $this->get_database_name()) {
+      return parent::select_db($this->database_name = $database_name);
+    } else {
+      return true;
+    }
   }
   public function uuid() {
     $row = $this->query('select uuid()')->fetch_assoc();

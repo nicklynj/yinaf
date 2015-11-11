@@ -118,16 +118,30 @@ class database extends \mysqli {
           ((!$value) or $this->all_numeric_keys($value))
         ) {
           if ($value) {
-            $clause .= ' in (' . implode(',',
-                array_map(
-                  array($this, 'escape'), 
-                  array_fill(0, count($value), $table), 
-                  array_fill(0, count($value), $column), 
-                  $value
-                )
-              ) . ')';
-            if (in_array(null, $value, true)) {
-              $clause = '('.$clause.' or '.$this->word($table, $column).' is null)';
+            $contains_null = in_array(null, $value, true);
+            $contains_zero = in_array('0', $value);
+            $contains_empty_string = in_array('', $value, true);
+            $value = array_filter(array_unique($value));
+            if ($contains_zero) {
+              $value[] = '0';
+            }
+            if ($contains_empty_string) {
+              $value[] = '';
+            }
+            if ($value) {
+              $clause .= ' in (' . implode(',',
+                  array_map(
+                    array($this, 'escape'), 
+                    array_fill(0, count($value), $table), 
+                    array_fill(0, count($value), $column), 
+                    $value
+                  )
+                ) . ')';
+              if ($contains_null) {
+                $clause = '('.$clause.' or '.$this->word($table, $column).' is null)';
+              }
+            } else {
+              $clause .= ' is null';
             }
           } else {
             return null;

@@ -53,16 +53,22 @@ class api {
     return $profiles;
   }
   public static function commit_transaction() {
+    self::database_transaction('commit');
+  }
+  public static function rollback_transaction() {
+    self::database_transaction('rollback');
+  }
+  private static function database_transaction($action) {
     if (isset(self::$database_instance)) {
       if (configuration::$debug) {
         $start = microtime(true);
         $call = array(
           'class' => 'api',
-          'function' => 'commit_transaction',
+          'function' => $action . '_transaction',
         );
         self::$calls[] = &$call;
       }
-      self::$database_instance->commit_transaction();
+      call_user_func(array(self::$database_instance, $action . '_transaction'));
       if (configuration::$debug) {
         $call += array(
           'total_time' => round(microtime(true) - $start, 4),

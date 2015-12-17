@@ -20,7 +20,7 @@ class request extends api {
     try {
       parent::__construct();
       return $this->api($class, $function, $arguments);
-    } catch (Exception $e) {
+    } catch (\Exception $e) {
       $this->error($e);
     }
   }

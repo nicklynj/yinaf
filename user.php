@@ -76,9 +76,10 @@ class user extends api {
         }
         return $session;
       }  
-    } else if (configuration::$user_use_requested_user_id) {
+    } else if (configuration::$user_use_requested_user_id_and_client_id) {
       return array(
         'user_id' => $request->get_requested('user_id'),
+        'client_id' => $request->get_requested('client_id'),
       );
     }
   }

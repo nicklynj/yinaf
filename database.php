@@ -658,7 +658,7 @@ class database extends \mysqli {
         if (isset($this->descriptions[$database_name][$table])) {
           return $this->descriptions[$database_name][$table];
         } else {
-          throw new Exception('table does not exist:"'.$table.'"');
+          throw new Exception('table does not exist:"'.$this->get_database_name().'.'.$table.'"');
         }
       }
     }

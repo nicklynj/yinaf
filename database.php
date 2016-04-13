@@ -229,7 +229,8 @@ class database extends \mysqli {
       if (
         ($value !== null) and
         (strpos($column, 'json_') !== 0) and
-        (strpos($column, 'compressed_json_') !== 0)
+        (strpos($column, 'compressed_json_') !== 0) and
+        (!is_array($value))
       ) {
         $value = strval($value);
       }

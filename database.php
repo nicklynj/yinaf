@@ -297,7 +297,7 @@ class database extends \mysqli {
   private function audit_class() {
     call_user_func_array(
       array(new configuration::$database_audit_class, configuration::$database_audit_function),
-      $this->audit_get_diffs(false)
+      $this->audit_get_diffs(true)
     );
   }
   private function audit() {

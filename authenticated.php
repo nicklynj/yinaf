@@ -10,11 +10,15 @@ class authenticated extends api {
   
   public function __construct() {
     parent::__construct();
-    if (!isset(self::$authenticated_session)) {
+    if (!(isset(self::$authenticated_session))) {
       self::$authenticated_session = $this->api('user', 'resume');
     }
     if (!($this->session = self::$authenticated_session)) {
-      throw new Exception('unauthenticated');
+      if (configuration::$debug) {
+        throw new Exception('unauthenticated in:"'.$this->class_name.'"');
+      } else {
+        throw new Exception('unauthenticated');
+      }
     }
   }
   

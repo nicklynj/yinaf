@@ -91,6 +91,9 @@ class database extends \mysqli {
     return ($attributes) and 
       (!(in_array(false, array_map('is_int', array_keys($attributes)), true)));
   }
+  private function numeric_incrementing_keys($attributes) {
+    return (array_keys($attributes) === range(0, count($attributes) - 1));
+  }
   private function get_where_clause_from_attributes_array($table, $attributes_array) {
     $clauses = array();
     foreach ($attributes_array as &$id_or_ids_or_attributes) {
@@ -237,6 +240,30 @@ class database extends \mysqli {
     }
     return $attributes;
   }
+  private function collapse_json_update($old, $new) {
+    if (is_array($new)) {
+      if (
+        (!($new)) or
+        ($this->numeric_incrementing_keys($new))
+      ) {
+        return $new;
+      } else {
+        if (!(is_array($old))) {
+          $old = array();
+        }
+        foreach ($new as $key => &$value) {
+          if (($result = $this->collapse_json_update(isset($old[$key]) ? $old[$key] : array(), $value)) === null) {
+            unset($old[$key]);
+          } else {
+            $old[$key] = $result;
+          }
+        }
+        return $old;
+      }
+    } else {
+      return $new;
+    }
+  }
   private function diff($new, $old) {
     $diffs = array();
     foreach ($new as $key => &$value) {
@@ -244,6 +271,9 @@ class database extends \mysqli {
         $diffs[$key] = $value;
       } else {
         if (is_array($value) or is_array($old[$key])) {
+          if (configuration::$database_collapse_json_updates) {
+            $value = $this->collapse_json_update($old[$key], $value);
+          }
           if (json_encode($old[$key]) !== json_encode($value)) {
             $diffs[$key] = $value;
           }

@@ -96,8 +96,15 @@ class user extends api {
             (!($client_id = request::get_request()->get_requested('client_id')))
           ) or
           (
-            ($user = $this->database->get('user', $session['user_id'])) and
-            (in_array($client_id, $user['client_ids'])) and
+            (
+              (
+                (configuration::$user_use_requested_user_id_and_client_id)
+              ) or
+              (
+                ($user = $this->database->get('user', $session['user_id'])) and
+                (in_array($client_id, $user['client_ids']))
+              )
+            ) and
             ($this->database->select_db(
               configuration::$database_client_prefix . '_' . $client_id
             ))

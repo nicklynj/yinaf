@@ -5,11 +5,11 @@ namespace yinaf;
 class database extends \mysqli {
 
   private $queries = array();
+  private $database_name = null;
   private $transaction_started;
   private $old_rows;
   private $new_rows;
   private $descriptions;
-  private $database_name;
   private $now;
   private $timestampdiffs;
   private $described;
@@ -19,7 +19,6 @@ class database extends \mysqli {
     $this->old_rows = array();
     $this->new_rows = array();
     $this->descriptions = array();
-    $this->database_name = null;
     $this->now = null;
     $this->timestampdiffs = array();
     $this->described = false;
@@ -696,7 +695,12 @@ class database extends \mysqli {
   }
   public function select_db($database_name) {
     if ($database_name !== $this->get_database_name()) {
-      return parent::select_db($this->database_name = $database_name);
+      if (parent::select_db($database_name)) {
+        $this->database_name = $database_name;
+        return true;
+      } else {
+        return false;
+      }
     } else {
       return true;
     }

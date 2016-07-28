@@ -45,8 +45,10 @@ class api {
           'own_time' => round($own_time = array_sum(array_column($stats, 'own_time')), 4),
           'avg_time' => round($time / $cnt, 4),
           'avg_own_time' => round($own_time / $cnt, 4),
-          'queries' => self::flatten(array_column($stats, 'queries')),
-          'own_queries' => self::flatten(array_column($stats, 'own_queries')),
+          'queries' => ($queries = self::flatten(array_column($stats, 'queries'))),
+          'query_time' => round(array_sum(array_column($queries, 'time')), 4),
+          'own_queries' => ($own_queries = self::flatten(array_column($stats, 'own_queries'))),
+          'own_query_time' => round(array_sum(array_column($own_queries, 'time')), 4),
         );
       }
       $profiles[$class] += array(
@@ -57,6 +59,8 @@ class api {
         'avg_own_time' => round($total_own_time / $total_cnt, 4),
         'queries' => self::flatten(array_column($profiles[$class], 'queries')),
         'own_queries' => self::flatten(array_column($profiles[$class], 'own_queries')),
+        'query_time' => round(array_sum(array_column($profiles[$class], 'query_time')), 4),
+        'own_query_time' => round(array_sum(array_column($profiles[$class], 'own_query_time')), 4),
       );
     }
     return $profiles;

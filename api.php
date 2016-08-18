@@ -96,6 +96,8 @@ class api {
       $call = array(
         'class' => $class,
         'function' => $function,
+        'own_time' => 0,
+        'queries' => array(),
       );
       if ($len = count(self::$call_stack)) {
         self::$call_stack[$len - 1]['calls'][] = &$call;

@@ -107,10 +107,14 @@ class api {
       self::$call_stack[] = &$call;
       $queries = count($this->database->get_queries());
     }
-    $result = call_user_func_array(
-      array($this->api_get_object($class), $function),
-      array_slice(func_get_args(), 2)
-    );
+    if (method_exists(($object = $this->api_get_object($class)), $function)) {
+      $result = call_user_func_array(
+        array($object, $function),
+        array_slice(func_get_args(), 2)
+      );
+    } else {
+      throw new Exception('class "'.$class.'" does not have a method "'.$function.'"');
+    }
     if (configuration::$debug) {
       array_pop(self::$call_stack);
       $stats = array(

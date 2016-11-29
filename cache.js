@@ -162,23 +162,29 @@ cache.prototype.get = function(table, id_or_attributes) {
 };
 
 
+cache.prototype.diff = function() {
+  this.cache_flush_remove_unnecessary_updates_();
+  return rocket.isEmpty(this.cache) ? null : this.cache;
+};
+
+
 cache.prototype.flush = function(callback) {
-  this.flush_remove_unnecessary_updates();
-  var negative_pointers = this.flush_remove_negative_pointers();
-  this.flush_move_unresolved_negative_pointer_rows_back(negative_pointers);
+  this.cache_flush_remove_unnecessary_updates_();
+  var negative_pointers = this.cache_flush_remove_negative_pointers_();
+  this.cache_flush_move_unresolved_negative_pointer_rows_back_(negative_pointers);
   var alias_to_table = [];
   var calls = [];
-  this.flush_get_inserts(calls, alias_to_table, negative_pointers);
-  this.flush_get_updates(calls, alias_to_table);
-  this.flush_get_updates_from_negative_pointers(calls, alias_to_table, negative_pointers);
-  this.flush_collapse_updates(calls);
+  this.cache_flush_get_inserts_(calls, alias_to_table, negative_pointers);
+  this.cache_flush_get_updates_(calls, alias_to_table);
+  this.cache_flush_get_updates_from_negative_pointers_(calls, alias_to_table, negative_pointers);
+  this.cache_flush_collapse_updates_(calls);
   for (var table in this.cache) {
     delete this.cache[table];
   }
   if (calls.length) {
     var self = this;
     api('api', 'multiple', calls, function(result) {
-      self.flush_handle_result(result, alias_to_table, negative_pointers);
+      self.cache_flush_handle_result_(result, alias_to_table, negative_pointers);
       callback.call(self);
     });
   } else {
@@ -187,7 +193,7 @@ cache.prototype.flush = function(callback) {
 };
 
 
-cache.prototype.flush_remove_unnecessary_updates = function() {
+cache.prototype.cache_flush_remove_unnecessary_updates_ = function() {
   for (var table in this.cache) {
     if (table in cache.cache) {
       for (var id in this.cache[table]) {
@@ -210,7 +216,7 @@ cache.prototype.flush_remove_unnecessary_updates = function() {
 };
 
 
-cache.prototype.flush_remove_negative_pointers = function() {
+cache.prototype.cache_flush_remove_negative_pointers_ = function() {
   var pointers = [];
   for (var table in this.cache) {
     for (var id in this.cache[table]) {
@@ -236,10 +242,10 @@ cache.prototype.flush_remove_negative_pointers = function() {
 };
 
 
-cache.prototype.flush_move_unresolved_negative_pointer_rows_back = function(negative_pointers) {
+cache.prototype.cache_flush_move_unresolved_negative_pointer_rows_back_ = function(negative_pointers) {
   for (var i = 0; negative_pointers[i]; ++i) {
     var pointer = negative_pointers[i];
-    if (!pointer.self) {
+    if (!(pointer.self)) {
       var match = false;
       for (var j = 0; negative_pointers[j]; ++j) {
         if (
@@ -250,18 +256,18 @@ cache.prototype.flush_move_unresolved_negative_pointer_rows_back = function(nega
           break;
         }
       }
-      if (!match) {
-        this.flush_replace_negative_pointer(negative_pointers, pointer.table, pointer.id);
+      if (!(match)) {
+        this.cache_flush_replace_negative_pointer_(negative_pointers, pointer.table, pointer.id);
         this.get_previous_layer().update(pointer.table, this.cache[pointer.table][pointer.id]);
         delete this.cache[pointer.table][pointer.id];
-        return this.flush_move_unresolved_negative_pointer_rows_back(negative_pointers);
+        return this.cache_flush_move_unresolved_negative_pointer_rows_back_(negative_pointers);
       }
     }
   }
 };
 
 
-cache.prototype.flush_replace_negative_pointer = function(negative_pointers, table, id) {
+cache.prototype.cache_flush_replace_negative_pointer_ = function(negative_pointers, table, id) {
   for (var i = 0; negative_pointers[i]; ++i) {
     if (
       (negative_pointers[i].table === table) &&
@@ -274,7 +280,7 @@ cache.prototype.flush_replace_negative_pointer = function(negative_pointers, tab
 };
 
 
-cache.prototype.flush_get_inserts = function(calls, alias_to_table, negative_pointers) {
+cache.prototype.cache_flush_get_inserts_ = function(calls, alias_to_table, negative_pointers) {
   for (var table in this.cache) {
     for (var id in this.cache[table]) {
       if (id < 0) {
@@ -296,7 +302,7 @@ cache.prototype.flush_get_inserts = function(calls, alias_to_table, negative_poi
 };
 
 
-cache.prototype.flush_get_updates = function(calls, alias_to_table) {
+cache.prototype.cache_flush_get_updates_ = function(calls, alias_to_table) {
   for (var table in this.cache) {
     for (var id in this.cache[table]) {
       if (id > 0) {
@@ -319,12 +325,12 @@ cache.prototype.flush_get_updates = function(calls, alias_to_table) {
 };
 
 
-cache.prototype.flush_get_updates_from_negative_pointers = function(calls, alias_to_table, negative_pointers) {
+cache.prototype.cache_flush_get_updates_from_negative_pointers_ = function(calls, alias_to_table, negative_pointers) {
   for (var i = 0; negative_pointers[i]; ++i) {
     var pointer = negative_pointers[i];
     var alias_id;
     var alias_value;
-    if (!pointer.self) {
+    if (!(pointer.self)) {
       var id;
       if (pointer.id > 0) {
         id = pointer.id;
@@ -371,7 +377,7 @@ cache.prototype.flush_get_updates_from_negative_pointers = function(calls, alias
 };
 
 
-cache.prototype.flush_collapse_updates = function(calls) {
+cache.prototype.cache_flush_collapse_updates_ = function(calls) {
   var map = {};
   for (var i = 0; calls[i]; ++i) {
     if (calls[i]['function'] === 'update') {
@@ -390,7 +396,7 @@ cache.prototype.flush_collapse_updates = function(calls) {
 };
 
 
-cache.prototype.flush_handle_result = function(result, alias_to_table) {
+cache.prototype.cache_flush_handle_result_ = function(result, alias_to_table) {
   for (var alias in result) {
     if (!(alias_to_table[alias] in cache.cache)) {
       cache.cache[alias_to_table[alias]] = {};

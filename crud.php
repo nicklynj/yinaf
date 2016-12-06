@@ -55,10 +55,14 @@ class crud extends authenticated {
     ));
   }
   public function get($id_or_attributes = null) {
-    return $this->database->get(
-      $this->class_name,
-      $id_or_attributes,
-      ($this->dictionary ? null : $this->get_root())
-    );
+    $results = $this->read($id_or_attributes, true);
+    foreach ($results as &$result) {
+      if (!($result['deleted'])) {
+        return $result;
+      }
+    }
+    foreach ($results as &$result) {
+      return $result;
+    }
   }
 }

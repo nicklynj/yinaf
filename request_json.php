@@ -14,6 +14,7 @@ class request_json extends request {
       error_reporting(0);
       ob_start('ob_gzhandler');
       header('Content-Type: application/json');
+      ini_set('display_errors', '1');
       set_error_handler(array($this, 'error_handler'));
       register_shutdown_function(array($this, 'shutdown_function'));
       try {

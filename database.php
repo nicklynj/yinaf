@@ -324,10 +324,16 @@ class database extends \mysqli {
     return $audits;
   }
   private function audit_class() {
-    call_user_func_array(
-      array(new configuration::$database_audit_class, configuration::$database_audit_function),
-      $this->audit_get_diffs(true)
-    );
+    if (
+      ($user = new user()) and
+      ($session = $user->resume()) and
+      ($user_id = $session['user_id'])
+    ) {
+      call_user_func_array(
+        array(new configuration::$database_audit_class, configuration::$database_audit_function),
+        $this->audit_get_diffs(true)
+      );
+    }
   }
   private function audit() {
     $audits = $this->audit_get_diffs(true);

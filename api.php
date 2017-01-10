@@ -196,10 +196,15 @@ class api {
     $columns = preg_split('/[\.\[]/', str_replace(']', '', substr($value, 1)));
     $replace = $results;
     for ($i = 0; isset($columns[$i]); ++$i) {
-      if (strlen($columns[$i])) {
+      if (
+        (strlen($columns[$i])) and
+        (isset($replace[$columns[$i]]))
+      ) {
         $replace = $replace[$columns[$i]];
       } else {
-        $replace = array_column($replace, $columns[++$i]);
+        if (isset($columns[($i + 1)])) {
+          $replace = array_column($replace, $columns[++$i]);
+        }
       }
     }
     return $replace;
